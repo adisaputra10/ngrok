@@ -19,3 +19,8 @@
     }
     reverse_proxy gotunnel:80
 }
+
+# Ollama AI API
+ollama.demolocal.online {
+    reverse_proxy localhost:11434
+}

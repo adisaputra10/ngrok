@@ -9,7 +9,7 @@ services:
     volumes:
       - gotunnel_data:/app/data
     environment:
-      - GOTUNNEL_DOMAIN=${GOTUNNEL_DOMAIN:-tunnel.localhost}
+      - GOTUNNEL_DOMAIN=${GOTUNNEL_DOMAIN:-demolocal.online}
       - GOTUNNEL_SECRET=${GOTUNNEL_SECRET:-change-me-to-a-random-secret}
       - GOTUNNEL_ADMIN_PORT=8080
       - GOTUNNEL_PROXY_PORT=80

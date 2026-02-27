@@ -27,7 +27,7 @@ Self-hosted tunnel service like ngrok/Cloudflare Tunnel, built in Go. Expose loc
                           │       │                               │
                           │  ┌────▼─────┐   ┌─────────────────┐  │
 Internet ───────────────▶ │  │  Reverse  │   │    SQLite DB    │  │
-  *.tunnel.example.com    │  │  Proxy    │   │  (users,tunnels)│  │
+  *.demolocal.online      │  │  Proxy    │   │  (users,tunnels)│  │
                           │  │ (port 80) │   └─────────────────┘  │
                           │  └──────────┘                         │
                           └──────────────────────────────────────┘
@@ -36,7 +36,7 @@ Internet ───────────────▶ │  │  Reverse  │
 **How it works:**
 1. Client connects to server via WebSocket and authenticates
 2. Server registers the subdomain and routes incoming HTTP traffic
-3. When a request arrives for `myapp.tunnel.example.com`, the server forwards it through the WebSocket to the client
+3. When a request arrives for `myapp.demolocal.online`, the server forwards it through the WebSocket to the client
 4. Client proxies the request to the local service and sends the response back
 5. Server returns the response to the original requester
 
@@ -89,14 +89,14 @@ You can find your auth token in the Dashboard → Setup & Install page.
 ### 5. Create a Tunnel
 
 ```bash
-# Expose localhost:3000 as https://myapp.tunnel.example.com
+# Expose localhost:3000 as https://myapp.demolocal.online
 gotunnel myapp 3000
 
 # Expose an API
 gotunnel api 8080
 
 # With explicit server and token
-gotunnel myapp 3000 --server tunnel.example.com:8080 --token gt_abc123...
+gotunnel myapp 3000 --server demolocal.online:8080 --token gt_abc123...
 ```
 
 ## Dashboard
@@ -113,7 +113,7 @@ The web dashboard provides:
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
-| `GOTUNNEL_DOMAIN` | `tunnel.localhost` | Base domain for tunnels |
+| `GOTUNNEL_DOMAIN` | `demolocal.online` | Base domain for tunnels |
 | `GOTUNNEL_ADMIN_PORT` | `8080` | Admin dashboard port |
 | `GOTUNNEL_PROXY_PORT` | `80` | Public tunnel traffic port |
 | `GOTUNNEL_SECRET` | (required) | Secret key for sessions |
@@ -128,7 +128,7 @@ The client stores config in `~/.gotunnel/config.json`:
 
 ```json
 {
-  "server_url": "tunnel.example.com:8080",
+  "server_url": "demolocal.online:8080",
   "auth_token": "gt_abc123..."
 }
 ```

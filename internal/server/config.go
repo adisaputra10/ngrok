@@ -33,7 +33,7 @@ type Config struct {
 // LoadConfig loads configuration from environment variables
 func LoadConfig() *Config {
 	return &Config{
-		Domain:            getEnv("GOTUNNEL_DOMAIN", "tunnel.localhost"),
+		Domain:            getEnv("GOTUNNEL_DOMAIN", "demolocal.online"),
 		AdminPort:         getEnv("GOTUNNEL_ADMIN_PORT", "8080"),
 		ProxyPort:         getEnv("GOTUNNEL_PROXY_PORT", "8081"),
 		Secret:            getEnv("GOTUNNEL_SECRET", "change-me-to-a-random-secret"),
