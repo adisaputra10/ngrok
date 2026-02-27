@@ -130,6 +130,7 @@ func (s *Server) startWithAutoTLS(adminHandler, proxyHandler http.Handler) error
 
 	// Configure ACME client
 	var acmeClient *acme.Client
+	var eab *acme.ExternalAccountBinding
 
 	if s.config.ZeroSSLAPIKey != "" {
 		// ZeroSSL with EAB credentials
@@ -146,10 +147,10 @@ func (s *Server) startWithAutoTLS(adminHandler, proxyHandler http.Handler) error
 
 		acmeClient = &acme.Client{
 			DirectoryURL: "https://acme.zerossl.com/v2/DV90",
-			ExternalAccountBinding: &acme.ExternalAccountBinding{
-				KID: eabKID,
-				Key: hmacKey,
-			},
+		}
+		eab = &acme.ExternalAccountBinding{
+			KID: eabKID,
+			Key: hmacKey,
 		}
 	} else {
 		// Default: Let's Encrypt
@@ -160,11 +161,12 @@ func (s *Server) startWithAutoTLS(adminHandler, proxyHandler http.Handler) error
 	}
 
 	certManager := &autocert.Manager{
-		Prompt:     autocert.AcceptTOS,
-		Cache:      autocert.DirCache(s.config.AutoTLSDir),
-		HostPolicy: autocert.HostWhitelist(domain, wildcardDomain),
-		Email:      s.config.AutoTLSEmail,
-		Client:     acmeClient,
+		Prompt:                 autocert.AcceptTOS,
+		Cache:                  autocert.DirCache(s.config.AutoTLSDir),
+		HostPolicy:             autocert.HostWhitelist(domain, wildcardDomain),
+		Email:                  s.config.AutoTLSEmail,
+		Client:                 acmeClient,
+		ExternalAccountBinding: eab,
 	}
 
 	// Combined handler that routes based on Host header
