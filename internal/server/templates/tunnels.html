@@ -1,0 +1,179 @@
+{{define "title"}}Tunnels — GoTunnel{{end}}
+{{define "body"}}
+<div class="flex min-h-screen">
+    {{template "sidebar" .}}
+
+    <main class="flex-1 p-8">
+        <div class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold">Tunnels</h1>
+                <p class="text-gray-400 mt-1">Manage your tunnel subdomains</p>
+            </div>
+            <button onclick="document.getElementById('reserveModal').classList.remove('hidden')"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition">
+                + Reserve Subdomain
+            </button>
+        </div>
+
+        {{$data := .Data}}
+
+        <!-- Tunnels Table -->
+        <div class="card rounded-xl">
+            <div class="overflow-x-auto">
+                {{if $data.Tunnels}}
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-gray-700/30">
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">URL</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Requests</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Last Connected</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-700/30">
+                        {{range $data.Tunnels}}
+                        <tr class="hover:bg-gray-800/20 transition" id="tunnel-row-{{.ID}}">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full {{if eq .Status "online"}}bg-green-400 pulse-dot{{else}}bg-gray-600{{end}}"></span>
+                                    <a href="https://{{.Subdomain}}.{{$data.Domain}}" target="_blank" class="font-mono text-sm text-cyan-400 hover:text-cyan-300">
+                                        {{.Subdomain}}.{{$data.Domain}}
+                                    </a>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{statusBadge .Status}}">
+                                    {{.Status}}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                {{if .Reserved}}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">Reserved</span>
+                                {{else}}
+                                <span class="text-xs text-gray-500">Dynamic</span>
+                                {{end}}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-400">{{.TotalRequests}}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                {{if .LastConnectedAt}}{{.LastConnectedAt.Format "2006-01-02 15:04"}}{{else}}Never{{end}}
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <a href="/dashboard/logs/{{.ID}}" class="text-xs text-indigo-400 hover:text-indigo-300">Logs</a>
+                                    {{if .Reserved}}
+                                    <button onclick="deleteTunnel({{.ID}})" class="text-xs text-red-400 hover:text-red-300">Delete</button>
+                                    {{end}}
+                                </div>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                {{else}}
+                <div class="text-center py-16 text-gray-500">
+                    <div class="text-5xl mb-4">🚀</div>
+                    <p class="text-lg mb-2">No tunnels yet</p>
+                    <p class="text-sm">Reserve a subdomain or connect a client to get started.</p>
+                    <div class="mt-6 card rounded-lg p-4 max-w-md mx-auto">
+                        <div class="font-mono text-sm text-left">
+                            <div class="text-gray-400">$ <span class="text-green-400">gotunnel</span> myapp 3000</div>
+                        </div>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Reserve Subdomain Modal -->
+<div id="reserveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="card rounded-xl p-6 w-full max-w-md mx-4">
+        <h3 class="text-lg font-semibold mb-4">Reserve a Subdomain</h3>
+        <p class="text-gray-400 text-sm mb-4">Reserve a subdomain so only you can use it. This ensures your URL is always available.</p>
+        
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-300 mb-1">Subdomain</label>
+            <div class="flex items-center">
+                <input type="text" id="reserveSubdomain" 
+                    class="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-l-lg focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500 font-mono"
+                    placeholder="myapp" pattern="[a-z0-9\-]+" maxlength="63">
+                <span class="px-3 py-3 bg-gray-800 border border-l-0 border-gray-700 rounded-r-lg text-gray-400 text-sm">.{{.Domain}}</span>
+            </div>
+            <div id="reserveError" class="mt-2 text-red-400 text-sm hidden"></div>
+        </div>
+
+        <div class="flex justify-end gap-3">
+            <button onclick="document.getElementById('reserveModal').classList.add('hidden')"
+                class="px-4 py-2 border border-gray-700 rounded-lg text-sm text-gray-300 hover:text-white transition">
+                Cancel
+            </button>
+            <button onclick="reserveSubdomain()" id="reserveBtn"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition">
+                Reserve
+            </button>
+        </div>
+    </div>
+</div>
+{{end}}
+{{define "scripts"}}
+<script>
+async function reserveSubdomain() {
+    const input = document.getElementById('reserveSubdomain');
+    const errorEl = document.getElementById('reserveError');
+    const btn = document.getElementById('reserveBtn');
+    const subdomain = input.value.trim().toLowerCase();
+
+    if (!subdomain) {
+        errorEl.textContent = 'Please enter a subdomain';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Reserving...';
+    errorEl.classList.add('hidden');
+
+    try {
+        const resp = await fetch('/api/tunnels/reserve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subdomain })
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            errorEl.textContent = data.error || 'Failed to reserve';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        window.location.reload();
+    } catch (e) {
+        errorEl.textContent = 'Network error';
+        errorEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Reserve';
+    }
+}
+
+async function deleteTunnel(tunnelId) {
+    if (!confirm('Are you sure you want to delete this tunnel?')) return;
+    
+    try {
+        const resp = await fetch('/api/tunnels/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tunnel_id: tunnelId })
+        });
+        if (resp.ok) {
+            document.getElementById('tunnel-row-' + tunnelId)?.remove();
+        }
+    } catch (e) {
+        alert('Failed to delete tunnel');
+    }
+}
+</script>
+{{end}}
+

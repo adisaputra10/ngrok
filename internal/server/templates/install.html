@@ -1,0 +1,158 @@
+{{define "title"}}Setup & Install — GoTunnel{{end}}
+{{define "body"}}
+<div class="flex min-h-screen">
+    {{template "sidebar" .}}
+
+    <main class="flex-1 p-8">
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold">Setup & Install</h1>
+            <p class="text-gray-400 mt-1">Install the GoTunnel client on your machine</p>
+        </div>
+
+        {{$data := .Data}}
+
+        <div class="max-w-3xl space-y-8">
+            <!-- Step 1: Install -->
+            <div class="card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-sm font-bold">1</span>
+                    <h2 class="text-lg font-semibold">Download & Install</h2>
+                </div>
+
+                <p class="text-gray-400 text-sm mb-4">Choose your platform and run the install command:</p>
+
+                <!-- Tabs -->
+                <div class="flex gap-2 mb-4">
+                    <button onclick="showTab('linux')" id="tab-linux" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white">Linux</button>
+                    <button onclick="showTab('mac')" id="tab-mac" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-800 text-gray-400">macOS</button>
+                    <button onclick="showTab('windows')" id="tab-windows" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-800 text-gray-400">Windows</button>
+                    <button onclick="showTab('docker')" id="tab-docker" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-800 text-gray-400">Docker</button>
+                </div>
+
+                <div id="install-linux" class="bg-gray-900 rounded-lg p-4 font-mono text-sm">
+                    <div class="text-gray-400 mb-2"># Download the latest binary (amd64)</div>
+                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/gotunnel-linux-amd64 -o gotunnel</div>
+                    <div class="text-green-400 select-all mt-1">chmod +x gotunnel</div>
+                    <div class="text-green-400 select-all mt-1">sudo mv gotunnel /usr/local/bin/</div>
+                    <div class="text-gray-400 mt-3"># For ARM64 (Raspberry Pi, etc.)</div>
+                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/gotunnel-linux-arm64 -o gotunnel</div>
+                </div>
+
+                <div id="install-mac" class="bg-gray-900 rounded-lg p-4 font-mono text-sm hidden">
+                    <div class="text-gray-400 mb-2"># Apple Silicon (M1/M2/M3)</div>
+                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/gotunnel-darwin-arm64 -o gotunnel</div>
+                    <div class="text-green-400 select-all mt-1">chmod +x gotunnel</div>
+                    <div class="text-green-400 select-all mt-1">sudo mv gotunnel /usr/local/bin/</div>
+                    <div class="text-gray-400 mt-3"># Intel Mac</div>
+                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/gotunnel-darwin-amd64 -o gotunnel</div>
+                </div>
+
+                <div id="install-windows" class="bg-gray-900 rounded-lg p-4 font-mono text-sm hidden">
+                    <div class="text-gray-400 mb-2"># Download the Windows binary</div>
+                    <div class="text-green-400 select-all">Invoke-WebRequest -Uri "https://{{$data.Domain}}/download/gotunnel-windows-amd64.exe" -OutFile "gotunnel.exe"</div>
+                    <div class="text-gray-400 mt-3"># Or build from source</div>
+                    <div class="text-green-400 select-all">go install gotunnel/cmd/client@latest</div>
+                </div>
+
+                <div id="install-docker" class="bg-gray-900 rounded-lg p-4 font-mono text-sm hidden">
+                    <div class="text-gray-400 mb-2"># Run as Docker container</div>
+                    <div class="text-green-400 select-all">docker run --rm -it gotunnel/client myapp 3000 \</div>
+                    <div class="text-green-400 select-all">  --server {{$data.Domain}}:{{$data.AdminPort}} \</div>
+                    <div class="text-green-400 select-all">  --token {{$data.AuthToken}}</div>
+                </div>
+            </div>
+
+            <!-- Step 2: Configure -->
+            <div class="card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-sm font-bold">2</span>
+                    <h2 class="text-lg font-semibold">Configure</h2>
+                </div>
+
+                <p class="text-gray-400 text-sm mb-4">Set up your authentication token. This connects the client to your account.</p>
+
+                <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm mb-4">
+                    <div class="text-gray-400"># Login with your auth token</div>
+                    <div class="text-green-400 select-all">gotunnel auth {{$data.AuthToken}}</div>
+                </div>
+
+                <p class="text-gray-400 text-sm">Or create a config file at <code class="bg-gray-800 px-1.5 py-0.5 rounded text-xs">~/.gotunnel/config.yml</code>:</p>
+
+                <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm mt-3">
+                    <div class="text-blue-400">server:</div>
+                    <div class="text-green-400 ml-4 select-all">url: {{$data.Domain}}:{{$data.AdminPort}}</div>
+                    <div class="text-blue-400">auth:</div>
+                    <div class="text-green-400 ml-4 select-all">token: {{$data.AuthToken}}</div>
+                </div>
+
+                <div class="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-sm">
+                    ⚠️ Keep your auth token secret! Anyone with this token can create tunnels under your account.
+                </div>
+            </div>
+
+            <!-- Step 3: Use -->
+            <div class="card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-sm font-bold">3</span>
+                    <h2 class="text-lg font-semibold">Start Tunneling</h2>
+                </div>
+
+                <p class="text-gray-400 text-sm mb-4">Expose your local services to the internet:</p>
+
+                <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm space-y-4">
+                    <div>
+                        <div class="text-gray-400"># Expose a web server on port 3000</div>
+                        <div class="text-green-400 select-all">gotunnel myapp 3000</div>
+                        <div class="text-gray-500 mt-1"># → https://myapp.{{$data.Domain}}</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-400"># Expose an API on port 8080</div>
+                        <div class="text-green-400 select-all">gotunnel api 8080</div>
+                        <div class="text-gray-500 mt-1"># → https://api.{{$data.Domain}}</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-400"># Multiple tunnels at once</div>
+                        <div class="text-green-400 select-all">gotunnel frontend 3000 &</div>
+                        <div class="text-green-400 select-all">gotunnel backend 8080 &</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auth Token Display -->
+            <div class="card rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Your Auth Token</h3>
+                <div class="flex items-center gap-3">
+                    <code id="authTokenDisplay" class="flex-1 bg-gray-900 px-4 py-3 rounded-lg font-mono text-sm text-cyan-400 select-all overflow-x-auto">{{$data.AuthToken}}</code>
+                    <button onclick="copyToken()" class="px-4 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition" id="copyBtn">
+                        Copy
+                    </button>
+                </div>
+                <p class="text-gray-500 text-xs mt-2">You can regenerate this token in <a href="/dashboard/settings" class="text-indigo-400 hover:text-indigo-300">Settings</a>.</p>
+            </div>
+        </div>
+    </main>
+</div>
+{{end}}
+{{define "scripts"}}
+<script>
+function showTab(tab) {
+    ['linux', 'mac', 'windows', 'docker'].forEach(t => {
+        document.getElementById('install-' + t).classList.toggle('hidden', t !== tab);
+        document.getElementById('tab-' + t).classList.toggle('bg-indigo-600', t === tab);
+        document.getElementById('tab-' + t).classList.toggle('text-white', t === tab);
+        document.getElementById('tab-' + t).classList.toggle('bg-gray-800', t !== tab);
+        document.getElementById('tab-' + t).classList.toggle('text-gray-400', t !== tab);
+    });
+}
+
+function copyToken() {
+    const token = document.getElementById('authTokenDisplay').textContent;
+    navigator.clipboard.writeText(token).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
+}
+</script>
+{{end}}
+

@@ -1,0 +1,21 @@
+# Caddyfile for GoTunnel (optional - for TLS termination)
+# Use this when you want automatic HTTPS with Let's Encrypt
+#
+# Uncomment the caddy service in docker-compose.yml to use this
+
+{
+    email {$ACME_EMAIL:admin@example.com}
+}
+
+# Admin dashboard
+{$GOTUNNEL_DOMAIN:tunnel.localhost} {
+    reverse_proxy gotunnel:8080
+}
+
+# Wildcard tunnel traffic
+*.{$GOTUNNEL_DOMAIN:tunnel.localhost} {
+    tls {
+        on_demand
+    }
+    reverse_proxy gotunnel:80
+}

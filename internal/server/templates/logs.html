@@ -1,0 +1,104 @@
+{{define "title"}}Request Logs — GoTunnel{{end}}
+{{define "body"}}
+<div class="flex min-h-screen">
+    {{template "sidebar" .}}
+
+    <main class="flex-1 p-8">
+        {{$data := .Data}}
+
+        <div class="mb-8">
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                <a href="/dashboard/tunnels" class="hover:text-gray-300">Tunnels</a>
+                <span>/</span>
+                <span class="text-gray-300">{{$data.Tunnel.Subdomain}}.{{$data.Domain}}</span>
+            </div>
+            <h1 class="text-2xl font-bold">Request Logs</h1>
+            <p class="text-gray-400 mt-1">
+                Recent HTTP requests for 
+                <span class="font-mono text-cyan-400">{{$data.Tunnel.Subdomain}}.{{$data.Domain}}</span>
+            </p>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="card rounded-xl p-4">
+                <div class="text-gray-400 text-xs">Total Requests</div>
+                <div class="text-xl font-bold mt-1">{{$data.Tunnel.TotalRequests}}</div>
+            </div>
+            <div class="card rounded-xl p-4">
+                <div class="text-gray-400 text-xs">Status</div>
+                <div class="text-xl font-bold mt-1 {{statusColor $data.Tunnel.Status}}">{{$data.Tunnel.Status}}</div>
+            </div>
+            <div class="card rounded-xl p-4">
+                <div class="text-gray-400 text-xs">Last Connected</div>
+                <div class="text-sm font-medium mt-1.5">
+                    {{if $data.Tunnel.LastConnectedAt}}{{$data.Tunnel.LastConnectedAt.Format "2006-01-02 15:04"}}{{else}}Never{{end}}
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Table -->
+        <div class="card rounded-xl">
+            <div class="overflow-x-auto">
+                {{if $data.Logs}}
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-gray-700/30">
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Time</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Method</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Path</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Duration</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Remote IP</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-700/30">
+                        {{range $data.Logs}}
+                        <tr class="hover:bg-gray-800/20 transition">
+                            <td class="px-6 py-3 text-sm text-gray-400 whitespace-nowrap font-mono text-xs">
+                                {{.CreatedAt.Format "15:04:05"}}
+                            </td>
+                            <td class="px-6 py-3">
+                                <span class="font-mono text-xs font-medium {{methodColor .Method}}">{{.Method}}</span>
+                            </td>
+                            <td class="px-6 py-3 text-sm font-mono text-xs text-gray-300 max-w-md truncate">
+                                {{truncate .Path 60}}
+                            </td>
+                            <td class="px-6 py-3">
+                                {{if and (ge .StatusCode 200) (lt .StatusCode 300)}}
+                                <span class="text-green-400 font-mono text-xs">{{.StatusCode}}</span>
+                                {{else if and (ge .StatusCode 300) (lt .StatusCode 400)}}
+                                <span class="text-cyan-400 font-mono text-xs">{{.StatusCode}}</span>
+                                {{else if and (ge .StatusCode 400) (lt .StatusCode 500)}}
+                                <span class="text-yellow-400 font-mono text-xs">{{.StatusCode}}</span>
+                                {{else}}
+                                <span class="text-red-400 font-mono text-xs">{{.StatusCode}}</span>
+                                {{end}}
+                            </td>
+                            <td class="px-6 py-3 text-xs font-mono">
+                                {{if lt .DurationMs 100.0}}
+                                <span class="text-green-400">{{printf "%.0f" .DurationMs}}ms</span>
+                                {{else if lt .DurationMs 500.0}}
+                                <span class="text-yellow-400">{{printf "%.0f" .DurationMs}}ms</span>
+                                {{else}}
+                                <span class="text-red-400">{{printf "%.0f" .DurationMs}}ms</span>
+                                {{end}}
+                            </td>
+                            <td class="px-6 py-3 text-xs text-gray-500 font-mono">{{.RemoteAddr}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                {{else}}
+                <div class="text-center py-16 text-gray-500">
+                    <div class="text-4xl mb-3">📋</div>
+                    <p>No request logs yet</p>
+                    <p class="text-sm mt-1">Logs will appear here when traffic flows through this tunnel.</p>
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </main>
+</div>
+{{end}}
+

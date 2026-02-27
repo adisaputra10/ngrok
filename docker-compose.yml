@@ -1,0 +1,38 @@
+services:
+  gotunnel:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"  # Admin dashboard & WebSocket
+      - "80:80"      # Tunnel traffic
+      - "443:443"    # Tunnel traffic (HTTPS, if using TLS)
+    volumes:
+      - gotunnel_data:/app/data
+    environment:
+      - GOTUNNEL_DOMAIN=${GOTUNNEL_DOMAIN:-tunnel.localhost}
+      - GOTUNNEL_SECRET=${GOTUNNEL_SECRET:-change-me-to-a-random-secret}
+      - GOTUNNEL_ADMIN_PORT=8080
+      - GOTUNNEL_PROXY_PORT=80
+      - GOTUNNEL_ALLOW_REGISTRATION=${GOTUNNEL_ALLOW_REGISTRATION:-true}
+      - GOTUNNEL_DB_PATH=/app/data/gotunnel.db
+
+  # Optional: Caddy reverse proxy for automatic HTTPS
+  # Uncomment the below to add TLS termination
+  #
+  # caddy:
+  #   image: caddy:latest
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   depends_on:
+  #     - gotunnel
+
+volumes:
+  gotunnel_data:
+  # caddy_data:
+  # caddy_config:

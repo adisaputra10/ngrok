@@ -1,0 +1,186 @@
+{{define "title"}}Settings — GoTunnel{{end}}
+{{define "body"}}
+<div class="flex min-h-screen">
+    {{template "sidebar" .}}
+
+    <main class="flex-1 p-8">
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold">Settings</h1>
+            <p class="text-gray-400 mt-1">Manage your account and authentication</p>
+        </div>
+
+        {{$data := .Data}}
+
+        <div class="max-w-2xl space-y-8">
+            <!-- Account Info -->
+            <div class="card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4">Account Information</h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700/30">
+                        <span class="text-gray-400 text-sm">Username</span>
+                        <span class="font-mono text-sm">{{.User.Username}}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700/30">
+                        <span class="text-gray-400 text-sm">Email</span>
+                        <span class="text-sm">{{.User.Email}}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700/30">
+                        <span class="text-gray-400 text-sm">Role</span>
+                        <span class="text-sm">{{if .User.IsAdmin}}<span class="text-yellow-400">Admin</span>{{else}}User{{end}}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700/30">
+                        <span class="text-gray-400 text-sm">Max Tunnels</span>
+                        <span class="text-sm">{{.User.MaxTunnels}}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2">
+                        <span class="text-gray-400 text-sm">Member Since</span>
+                        <span class="text-sm">{{.User.CreatedAt.Format "January 2, 2006"}}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auth Token -->
+            <div class="card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-2">Auth Token</h2>
+                <p class="text-gray-400 text-sm mb-4">Use this token to authenticate the CLI client.</p>
+
+                <div class="flex items-center gap-3 mb-4">
+                    <code id="tokenValue" class="flex-1 bg-gray-900 px-4 py-3 rounded-lg font-mono text-sm text-cyan-400 select-all overflow-x-auto">{{$data.AuthToken}}</code>
+                    <button onclick="copyToClipboard('tokenValue')" class="px-4 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition" id="copyTokenBtn">
+                        Copy
+                    </button>
+                </div>
+
+                <button onclick="regenerateToken()" id="regenBtn"
+                    class="px-4 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg text-sm transition">
+                    Regenerate Token
+                </button>
+                <p class="text-gray-500 text-xs mt-2">⚠️ Regenerating will disconnect all active CLI sessions.</p>
+            </div>
+
+            <!-- Change Password -->
+            <div class="card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-2">Change Password</h2>
+                <p class="text-gray-400 text-sm mb-4">Update your account password.</p>
+
+                <div class="space-y-4" id="passwordForm">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Current Password</label>
+                        <input type="password" id="currentPassword"
+                            class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500"
+                            placeholder="••••••••">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">New Password</label>
+                        <input type="password" id="newPassword" minlength="6"
+                            class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500"
+                            placeholder="••••••••">
+                    </div>
+                    <div id="passwordError" class="text-red-400 text-sm hidden"></div>
+                    <div id="passwordSuccess" class="text-green-400 text-sm hidden"></div>
+                    <button onclick="changePassword()" id="changePassBtn"
+                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition">
+                        Update Password
+                    </button>
+                </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="card rounded-xl p-6 border-red-500/20">
+                <h2 class="text-lg font-semibold text-red-400 mb-2">Danger Zone</h2>
+                <p class="text-gray-400 text-sm mb-4">Sign out of your account.</p>
+                <a href="/logout" class="inline-block px-4 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg text-sm transition">
+                    Sign Out
+                </a>
+            </div>
+        </div>
+    </main>
+</div>
+{{end}}
+{{define "scripts"}}
+<script>
+function copyToClipboard(elementId) {
+    const text = document.getElementById(elementId).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyTokenBtn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
+}
+
+async function regenerateToken() {
+    if (!confirm('Are you sure? This will invalidate your current token and disconnect all CLI sessions.')) return;
+    
+    const btn = document.getElementById('regenBtn');
+    btn.disabled = true;
+    btn.textContent = 'Regenerating...';
+
+    try {
+        const resp = await fetch('/api/token/regenerate', { method: 'POST' });
+        const data = await resp.json();
+        if (resp.ok) {
+            document.getElementById('tokenValue').textContent = data.auth_token;
+            alert('Token regenerated successfully!');
+        } else {
+            alert(data.error || 'Failed to regenerate token');
+        }
+    } catch (e) {
+        alert('Network error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Regenerate Token';
+    }
+}
+
+async function changePassword() {
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const errorEl = document.getElementById('passwordError');
+    const successEl = document.getElementById('passwordSuccess');
+    const btn = document.getElementById('changePassBtn');
+
+    errorEl.classList.add('hidden');
+    successEl.classList.add('hidden');
+
+    if (!currentPassword || !newPassword) {
+        errorEl.textContent = 'Please fill in both fields';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        errorEl.textContent = 'New password must be at least 6 characters';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+
+    try {
+        const resp = await fetch('/api/password/change', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            successEl.textContent = 'Password updated successfully!';
+            successEl.classList.remove('hidden');
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+        } else {
+            errorEl.textContent = data.error || 'Failed to change password';
+            errorEl.classList.remove('hidden');
+        }
+    } catch (e) {
+        errorEl.textContent = 'Network error';
+        errorEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Update Password';
+    }
+}
+</script>
+{{end}}
+

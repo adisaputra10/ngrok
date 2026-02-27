@@ -1,0 +1,63 @@
+{{define "title"}}Register — GoTunnel{{end}}
+{{define "body"}}
+<div class="gradient-bg min-h-screen flex items-center justify-center px-4">
+    <div class="w-full max-w-md">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <a href="/" class="inline-flex items-center gap-2">
+                <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center font-bold">GT</div>
+                <span class="text-2xl font-semibold">GoTunnel</span>
+            </a>
+        </div>
+
+        <!-- Register Card -->
+        <div class="card rounded-xl p-8">
+            <h2 class="text-2xl font-bold mb-6">Create your account</h2>
+
+            {{if .Flash}}
+            <div class="mb-4 p-3 rounded-lg {{if eq .FlashType "error"}}bg-red-500/10 border border-red-500/20 text-red-400{{else}}bg-green-500/10 border border-green-500/20 text-green-400{{end}} text-sm">
+                {{.Flash}}
+            </div>
+            {{end}}
+
+            <form method="POST" action="/register" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                    <input type="email" name="email" required
+                        class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-white placeholder-gray-500"
+                        placeholder="you@example.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                    <input type="text" name="username" required pattern="[a-z0-9\-_]+" minlength="3" maxlength="32"
+                        class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-white placeholder-gray-500"
+                        placeholder="johndoe">
+                    <p class="mt-1 text-xs text-gray-500">Lowercase letters, numbers, hyphens, underscores. 3-32 chars.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                    <input type="password" name="password" required minlength="6"
+                        class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-white placeholder-gray-500"
+                        placeholder="••••••••">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Confirm Password</label>
+                    <input type="password" name="confirm_password" required minlength="6"
+                        class="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-white placeholder-gray-500"
+                        placeholder="••••••••">
+                </div>
+                <button type="submit"
+                    class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium transition">
+                    Create Account
+                </button>
+            </form>
+
+            <p class="mt-6 text-center text-gray-400 text-sm">
+                Already have an account?
+                <a href="/login" class="text-indigo-400 hover:text-indigo-300">Sign in</a>
+            </p>
+        </div>
+    </div>
+</div>
+{{end}}
+

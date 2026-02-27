@@ -1,0 +1,74 @@
+{{define "sidebar"}}
+<aside class="w-64 min-h-screen bg-gray-900/50 border-r border-gray-800/50 flex flex-col">
+    <!-- Logo -->
+    <div class="px-6 py-5 border-b border-gray-800/50">
+        <a href="/dashboard" class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-bold text-sm">GT</div>
+            <span class="text-lg font-semibold">GoTunnel</span>
+        </a>
+    </div>
+
+    <!-- Impersonation Banner -->
+    {{if .ImpersonatingAdmin}}
+    <div class="mx-3 mt-3 px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-xs text-amber-300">
+        <div class="font-semibold mb-1">⚠ Viewing as {{if .User}}{{.User.Username}}{{end}}</div>
+        <div class="text-amber-400/70 mb-2">Admin: {{.ImpersonatingAdmin.Username}}</div>
+        <form method="POST" action="/admin/stop-impersonate">
+            <button type="submit" class="w-full text-center px-2 py-1 rounded bg-amber-500/30 hover:bg-amber-500/50 text-amber-200 text-xs font-medium">
+                Stop Impersonating
+            </button>
+        </form>
+    </div>
+    {{end}}
+
+    <!-- Nav Links -->
+    <nav class="flex-1 px-3 py-4 space-y-1">
+        <a href="/dashboard" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            Dashboard
+        </a>
+        <a href="/dashboard/tunnels" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            Tunnels
+        </a>
+        <a href="/dashboard/install" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Setup & Install
+        </a>
+        <a href="/dashboard/settings" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            Settings
+        </a>
+
+        <!-- Admin section -->
+        {{if .User}}{{if .User.IsAdmin}}
+        <div class="pt-3 mt-3 border-t border-gray-800/50">
+            <div class="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
+            <a href="/admin/users" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:text-white mt-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                User Management
+            </a>
+        </div>
+        {{end}}{{end}}
+    </nav>
+
+    <!-- User -->
+    <div class="px-4 py-4 border-t border-gray-800/50">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-sm font-medium">
+                {{if .User}}{{slice .User.Username 0 1}}{{end}}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium truncate">
+                    {{if .User}}{{.User.Username}}{{end}}
+                    {{if .User}}{{if .User.IsAdmin}}<span class="ml-1 text-xs text-indigo-400 font-normal">admin</span>{{end}}{{end}}
+                </div>
+                <div class="text-xs text-gray-500 truncate">{{if .User}}{{.User.Email}}{{end}}</div>
+            </div>
+            <a href="/logout" class="text-gray-400 hover:text-white" title="Logout">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+            </a>
+        </div>
+    </div>
+</aside>
+{{end}}
