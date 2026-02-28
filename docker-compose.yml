@@ -20,6 +20,10 @@ services:
       - GOTUNNEL_AUTO_TLS_EMAIL=${GOTUNNEL_AUTO_TLS_EMAIL:-admin@demolocal.online}
       - GOTUNNEL_AUTO_TLS_DIR=/app/data/certs
       - GOTUNNEL_ZEROSSL_API_KEY=${GOTUNNEL_ZEROSSL_API_KEY:-}
+      - GOTUNNEL_EXTRA_PROXIES=${GOTUNNEL_EXTRA_PROXIES:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL:-}
 
   # Optional: Caddy reverse proxy for automatic HTTPS
   # Uncomment the below to add TLS termination

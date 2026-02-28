@@ -135,6 +135,18 @@ func (s *Service) Login(emailOrUsername, password string) (*models.User, string,
 	return user, sessionID, nil
 }
 
+// CreateSession creates a new session for a user (used by OAuth handlers)
+func (s *Service) CreateSession(userID int64) (string, error) {
+	sessionID := GenerateSessionID()
+	expiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
+
+	if err := s.db.CreateSession(sessionID, userID, expiresAt); err != nil {
+		return "", fmt.Errorf("failed to create session: %w", err)
+	}
+
+	return sessionID, nil
+}
+
 // ValidateSession checks if a session is valid and returns the user
 func (s *Service) ValidateSession(sessionID string) (*models.User, error) {
 	session, err := s.db.GetSession(sessionID)

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"strings"
 
@@ -25,10 +27,14 @@ type Config struct {
 	AllowRegistration bool
 	TLSCert           string
 	TLSKey            string
-	AutoTLS           bool   // Enable automatic TLS via ZeroSSL/ACME
-	AutoTLSEmail      string // Email for ACME registration
-	AutoTLSDir        string // Directory to cache certificates
-	ZeroSSLAPIKey     string // ZeroSSL EAB API key (optional, uses Let's Encrypt if empty)
+	AutoTLS           bool              // Enable automatic TLS via ZeroSSL/ACME
+	AutoTLSEmail      string            // Email for ACME registration
+	AutoTLSDir        string            // Directory to cache certificates
+	ZeroSSLAPIKey     string            // ZeroSSL EAB API key (optional, uses Let's Encrypt if empty)
+	ExtraProxies      map[string]string // Extra domain → upstream URL mappings (e.g. ollama.demolocal.online=http://localhost:11434)
+	GoogleClientID     string            // Google OAuth client ID
+	GoogleClientSecret string            // Google OAuth client secret
+	GoogleRedirectURL  string            // Google OAuth redirect URL
 }
 
 // LoadConfig loads configuration from environment variables
@@ -46,7 +52,27 @@ func LoadConfig() *Config {
 		AutoTLSEmail:      getEnv("GOTUNNEL_AUTO_TLS_EMAIL", ""),
 		AutoTLSDir:        getEnv("GOTUNNEL_AUTO_TLS_DIR", "./data/certs"),
 		ZeroSSLAPIKey:     getEnv("GOTUNNEL_ZEROSSL_API_KEY", ""),
+		ExtraProxies:      parseExtraProxies(getEnv("GOTUNNEL_EXTRA_PROXIES", "")),
+		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURL:  getEnv("GOOGLE_REDIRECT_URL", ""),
 	}
+}
+
+// parseExtraProxies parses GOTUNNEL_EXTRA_PROXIES env var.
+// Format: "host1=http://upstream1,host2=http://upstream2"
+func parseExtraProxies(raw string) map[string]string {
+	result := make(map[string]string)
+	if raw == "" {
+		return result
+	}
+	for _, entry := range strings.Split(raw, ",") {
+		parts := strings.SplitN(strings.TrimSpace(entry), "=", 2)
+		if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+			result[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+	return result
 }
 
 func getEnv(key, defaultValue string) string {
@@ -163,9 +189,13 @@ func (s *Server) startWithAutoTLS(adminHandler, proxyHandler http.Handler) error
 	certManager := &autocert.Manager{
 		Prompt: autocert.AcceptTOS,
 		Cache:  autocert.DirCache(s.config.AutoTLSDir),
-		// Allow main domain and any subdomain (individual certs issued on-demand per subdomain)
 		HostPolicy: func(ctx context.Context, host string) error {
+			// Allow main domain and all subdomains
 			if host == domain || strings.HasSuffix(host, "."+domain) {
+				return nil
+			}
+			// Allow extra proxy domains
+			if _, ok := s.config.ExtraProxies[host]; ok {
 				return nil
 			}
 			return fmt.Errorf("[tls] hostname %q not allowed", host)
@@ -175,18 +205,36 @@ func (s *Server) startWithAutoTLS(adminHandler, proxyHandler http.Handler) error
 		ExternalAccountBinding: eab,
 	}
 
+	// Build extra reverse proxies
+	extraReverseProxies := make(map[string]*httputil.ReverseProxy)
+	for host, upstream := range s.config.ExtraProxies {
+		upstreamURL, err := url.Parse(upstream)
+		if err != nil {
+			log.Printf("[tls] Invalid upstream URL for %s: %v", host, err)
+			continue
+		}
+		extraReverseProxies[host] = httputil.NewSingleHostReverseProxy(upstreamURL)
+		log.Printf("[tls] Extra proxy: https://%s → %s", host, upstream)
+	}
+
 	// Combined handler that routes based on Host header
 	combinedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
 		if idx := strings.LastIndex(host, ":"); idx != -1 {
 			host = host[:idx]
 		}
-		// If the request is for a subdomain, route to proxy; otherwise admin
+		// Check extra proxy domains first (e.g. ollama.demolocal.online)
+		if rp, ok := extraReverseProxies[host]; ok {
+			rp.ServeHTTP(w, r)
+			return
+		}
+		// Subdomains of main domain → tunnel proxy
 		if host != domain && strings.HasSuffix(host, "."+domain) {
 			proxyHandler.ServeHTTP(w, r)
-		} else {
-			adminHandler.ServeHTTP(w, r)
+			return
 		}
+		// Main domain → admin
+		adminHandler.ServeHTTP(w, r)
 	})
 
 	tlsConfig := &tls.Config{

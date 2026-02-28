@@ -141,6 +141,10 @@ func (s *Server) adminHandler() http.Handler {
 	mux.HandleFunc("/logout", s.handleLogout)
 	mux.HandleFunc("/download/", s.handleDownload)
 
+	// OAuth routes
+	mux.HandleFunc("/api/auth/google/login", s.handleGoogleLogin)
+	mux.HandleFunc("/api/auth/google/callback", s.handleGoogleCallback)
+
 	// Protected routes (dashboard)
 	mux.HandleFunc("/dashboard", s.requireAuth(s.handleDashboard))
 	mux.HandleFunc("/dashboard/tunnels", s.requireAuth(s.handleTunnels))
