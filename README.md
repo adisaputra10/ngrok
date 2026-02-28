@@ -14,7 +14,6 @@ Self-hosted tunnel service for **demolocal.online** — expose local services to
 - **Automatic HTTPS** — ZeroSSL/Let's Encrypt auto-TLS via ACME
 - **Cross-Platform Client** — Linux, macOS, and Windows binaries
 - **Google OAuth** — Sign in with Google
-- **Extra Proxies** — Route custom subdomains (e.g. `ollama.demolocal.online`) to internal services
 
 ## Architecture
 
@@ -186,7 +185,7 @@ Config is stored at `~/.demolocal/config.json`:
 Route specific subdomains directly to internal services without a tunnel client:
 
 ```env
-GOTUNNEL_EXTRA_PROXIES=ollama.demolocal.online=http://10.11.0.9:11434,grafana.demolocal.online=http://localhost:3000
+
 ```
 
 ## Dashboard
