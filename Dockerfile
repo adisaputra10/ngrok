@@ -17,6 +17,10 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -ldflags="-s -w" -o /gotunnel-server ./cmd/server
 
+# Build passwd utility
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o /gotunnel-passwd ./cmd/passwd
+
 # Cross-compile client binaries for all platforms
 RUN mkdir -p /downloads && \
     CGO_ENABLED=0 GOOS=linux   GOARCH=amd64  go build -ldflags="-s -w" -o /downloads/demolocal-linux-amd64   ./cmd/client && \
@@ -34,6 +38,9 @@ WORKDIR /app
 
 # Copy server binary
 COPY --from=builder /gotunnel-server /app/gotunnel-server
+
+# Copy passwd utility
+COPY --from=builder /gotunnel-passwd /app/gotunnel-passwd
 
 # Copy pre-built client binaries so /download/ route works
 COPY --from=builder /downloads /app/downloads
