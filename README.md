@@ -8,37 +8,43 @@ Self-hosted tunnel service for **demolocal.online** — expose local services to
 - **Multi-User** — Each user gets their own account, auth token, and tunnels
 - **Custom Subdomains** — Reserve subdomains for persistent URLs at `*.demolocal.online`
 - **Request Inspection** — Real-time HTTP request logs with status codes and timing
-- **WebSocket Tunnels** — Efficient tunnel protocol over WebSocket (no SSH needed)
+- **WebSocket Tunnels** — Secure WSS tunnels over port 443 (firewall-friendly)
 - **Single Binary** — Server and client are standalone Go binaries, zero runtime dependencies
-- **Docker Ready** — Deploy with `docker compose up` in minutes
+- **Docker Ready** — Pre-built client binaries available for download
 - **Automatic HTTPS** — ZeroSSL/Let's Encrypt auto-TLS via ACME
-- **Cross-Platform Client** — Linux, macOS, and Windows binaries
+- **Cross-Platform Client** — Linux (amd64/arm64), macOS (Intel/Silicon), Windows binaries
 - **Google OAuth** — Sign in with Google
+- **Extra Proxies** — Route custom subdomains to internal services
 
 ## Architecture
 
 ```
-┌─────────────┐          ┌──────────────────────────────────────┐
-│   Client     │ WebSocket│         Demolocal Server              │
-│  (demolocal) │─────────▶│                                      │
-│              │          │  ┌──────────┐   ┌─────────────────┐  │
-│ localhost:   │◀─────────│  │ Tunnel   │   │  Web Dashboard  │  │
-│   3000       │  HTTP    │  │ Manager  │   │  (port 8080)    │  │
-└─────────────┘  Proxy   │  └────┬─────┘   └─────────────────┘  │
-                          │       │                               │
-                          │  ┌────▼─────┐   ┌─────────────────┐  │
-Internet ───────────────▶ │  │  Reverse  │   │    SQLite DB    │  │
-  *.demolocal.online      │  │  Proxy    │   │  (users,tunnels)│  │
-                          │  │ (port 443)│   └─────────────────┘  │
-                          │  └──────────┘                         │
-                          └──────────────────────────────────────┘
+┌──────────────────┐          ┌──────────────────────────────────────┐
+│   Client         │ WSS/TLS  │         Demolocal Server              │
+│  (demolocal)     │─────────▶│                                      │
+│  localhost:3000  │Port 443  │  ┌──────────┐   ┌─────────────────┐  │
+│                  │◀─────────│  │ Tunnel   │   │  Web Dashboard  │  │
+│                  │  Tunnel  │  │ Manager  │   │  (port 8080)    │  │
+└──────────────────┘  Proxy   │  └────┬─────┘   └─────────────────┘  │
+                                      │                               │
+                          ┌───────────▼──────┐  ┌─────────────────┐  │
+                          │  Reverse Proxy   │  │    SQLite DB    │  │
+                          │  (port 443 HTTPS)│  │  (users,tunnels)│  │
+                          │                  │  └─────────────────┘  │
+                          │ *.demolocal.online                      │
+                          └──────────────────┘                         │
+
+ Internet
+    │ HTTPS
+    ▼
+ myapp.demolocal.online ──▶ [Server:443] ──▶ [WSS Tunnel] ──▶ localhost:3000
 ```
 
 **How it works:**
-1. Client connects to server via WebSocket and authenticates
+1. Client connects to server via **WSS (TLS)** on **port 443** and authenticates
 2. Server registers the subdomain and routes incoming HTTPS traffic
-3. When a request arrives for `myapp.demolocal.online`, the server forwards it through the WebSocket to the client
-4. Client proxies the request to the local service and sends the response back
+3. When a request arrives for `myapp.demolocal.online`, server forwards it through the tunnel to the client
+4. Client proxies the request to the local service (e.g. localhost:3000)
 5. Server returns the response to the original requester
 
 ## Quick Start
@@ -52,7 +58,7 @@ cd ngrok
 
 # Configure
 cp .env.example .env
-# Edit .env — set GOTUNNEL_SECRET and other values
+# Edit .env — set GOTUNNEL_SECRET and optional settings
 
 # Run with Docker (recommended)
 docker compose up -d
@@ -64,7 +70,7 @@ make build
 
 ### 2. Set Up DNS
 
-Add a wildcard A record pointing to your server:
+Add wildcard A records pointing to your server:
 
 | Type | Name | Value |
 |------|------|-------|
@@ -75,7 +81,9 @@ Add a wildcard A record pointing to your server:
 
 Open `https://demolocal.online` in your browser and register, or use Google OAuth.
 
-### 4. Install the Client
+### 4. Download & Install Client
+
+The client is **pre-configured with `demolocal.online`** — choose your platform:
 
 **Linux (amd64)**
 ```bash
@@ -84,14 +92,14 @@ chmod +x demolocal
 sudo mv demolocal /usr/local/bin/
 ```
 
-**Linux (ARM64 — Raspberry Pi, etc.)**
+**Linux (ARM64 — Raspberry Pi, Jetson)**
 ```bash
 curl -fsSL https://demolocal.online/download/demolocal-linux-arm64 -o demolocal
 chmod +x demolocal
 sudo mv demolocal /usr/local/bin/
 ```
 
-**macOS (Apple Silicon)**
+**macOS (Apple Silicon M1/M2/M3)**
 ```bash
 curl -fsSL https://demolocal.online/download/demolocal-darwin-arm64 -o demolocal
 chmod +x demolocal
@@ -110,25 +118,35 @@ sudo mv demolocal /usr/local/bin/
 Invoke-WebRequest -Uri "https://demolocal.online/download/demolocal-windows-amd64.exe" -OutFile "demolocal.exe"
 ```
 
+Or build from source:
+```bash
+go install github.com/adisaputra10/ngrok/cmd/client@latest
+```
+
 ### 5. Authenticate
 
 ```bash
-demolocal auth <your-auth-token> --server demolocal.online:8080
+demolocal auth <your-auth-token>
+# ✓ Auth token saved
+#   Config: ~/.demolocal/config.json
+#   Server: demolocal.online  (connects via wss:// on port 443)
 ```
 
-Find your auth token on the **Dashboard → Setup & Install** page.
+Get your token at: **https://demolocal.online/dashboard/install**
 
-### 6. Create a Tunnel
+### 6. Start Tunneling
 
 ```bash
-# Expose localhost:3000 → https://myapp.demolocal.online
+# One command — works immediately
 demolocal myapp 3000
+# Connecting to demolocal.online (wss://demolocal.online)...
+# Session Status:  online
+# Forwarding:      https://myapp.demolocal.online → localhost:3000
 
-# Expose an API
-demolocal api 8080
-
-# With explicit server and token
-demolocal myapp 3000 --server demolocal.online:8080 --token gt_abc123...
+# Expose multiple services
+demolocal frontend 3000 &
+demolocal backend 8080 &
+demolocal database 5432 &
 ```
 
 ## CLI Reference
@@ -138,280 +156,227 @@ demolocal v1.0.0 — Expose local services to the internet
 
 Usage:
   demolocal <subdomain> <port> [options]
-  demolocal auth <token>                  Save auth token
+  demolocal auth <token>                  Save auth token (server: demolocal.online)
   demolocal config                        Show current config
 
 Options:
-  --server <url>    Server URL (e.g., demolocal.online:8080)
+  --server <url>    Override server URL (default: demolocal.online via wss://)
   --token <token>   Auth token (overrides saved config)
   --version, -v     Show version
   --help, -h        Show help
 
 Examples:
-  demolocal myapp 3000                    https://myapp.demolocal.online → localhost:3000
-  demolocal api 8080 --server demolocal.online:8080 --token gt_abc123...
+  demolocal auth gt_abc123...             # Save token, ready to tunnel
+  demolocal myapp 3000                    # https://myapp.demolocal.online → localhost:3000
+  demolocal api 8080                      # https://api.demolocal.online → localhost:8080
+  demolocal myapp 3000 --server localhost:8080  # local dev (ws://)
 ```
 
-Config is stored at `~/.demolocal/config.json`:
+### Config File
+
+The client stores config at `~/.demolocal/config.json`:
 ```json
 {
-  "server_url": "demolocal.online:8080",
-  "auth_token": "gt_abc123..."
+  "server_url": "demolocal.online",
+  "auth_token": "gt_7d27b9b49fea763e1633..."
 }
 ```
 
+The server is **pre-configured in the binary for production** (`wss://demolocal.online` = port 443).
+
+For **local development**, override with:
+```bash
+demolocal myapp 3000 --server localhost:8080  # ws://localhost:8080
+```
+
+## Dashboard
+
+Access the web dashboard at: **https://demolocal.online:8080** (or `http://<server-ip>:8080` from your network)
+
+**Features:**
+- **Dashboard** — Overview, stats, active tunnels, request rate
+- **Tunnels** — Create/manage tunnels, reserve subdomains, view status
+- **Setup & Install** — Client install with your personal auth token
+- **Settings** — Change password, regenerate auth token
+- **Request Logs** — Per-tunnel HTTP logs with method, path, status code, response time
+
 ## Server Configuration
+
+Edit `.env` before running:
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
-| `GOTUNNEL_DOMAIN` | `demolocal.online` | Base domain for tunnels |
-| `GOTUNNEL_ADMIN_PORT` | `8080` | Admin dashboard port |
-| `GOTUNNEL_PROXY_PORT` | `80` | HTTP tunnel traffic port |
-| `GOTUNNEL_SECRET` | (required) | Secret key for sessions |
-| `GOTUNNEL_DB_TYPE` | `sqlite` | Database type (`sqlite` or `mysql`) |
-| `GOTUNNEL_SQLITE_DB_PATH` | `./data/gotunnel.db` | SQLite database path |
-| `GOTUNNEL_ALLOW_REGISTRATION` | `true` | Enable public registration |
-| `GOTUNNEL_AUTO_TLS` | `false` | Enable ZeroSSL/Let's Encrypt auto-TLS |
-| `GOTUNNEL_AUTO_TLS_EMAIL` | | Email for ACME registration |
-| `GOTUNNEL_AUTO_TLS_DIR` | `./data/certs` | Certificate cache directory |
-| `GOTUNNEL_ZEROSSL_API_KEY` | | ZeroSSL API key for EAB credentials |
-| `GOTUNNEL_EXTRA_PROXIES` | | Extra subdomain→upstream mappings (see below) |
+| `GOTUNNEL_DOMAIN` | `demolocal.online` | Base domain for tunnel subdomains |
+| `GOTUNNEL_SECRET` | (required) | Secret key for session encryption |
+| `GOTUNNEL_DB_TYPE` | `sqlite` | Database: `sqlite` or `mysql` |
+| `GOTUNNEL_SQLITE_DB_PATH` | `./data/gotunnel.db` | SQLite DB file |
+| `GOTUNNEL_ADMIN_PORT` | `8080` | Dashboard & API port |
+| `GOTUNNEL_PROXY_PORT` | `80` | HTTP port (for ACME challenges) |
+| `GOTUNNEL_ALLOW_REGISTRATION` | `true` | Allow public registration |
+| `GOTUNNEL_AUTO_TLS` | `true` | Enable automatic HTTPS (ZeroSSL/Let's Encrypt) |
+| `GOTUNNEL_AUTO_TLS_EMAIL` | | Email for ACME certificate registration |
+| `GOTUNNEL_AUTO_TLS_DIR` | `./data/certs` | Directory to cache TLS certificates |
+| `GOTUNNEL_ZEROSSL_API_KEY` | | ZeroSSL API key (optional; uses Let's Encrypt if empty) |
+| `GOTUNNEL_EXTRA_PROXIES` | | Route specific subdomains to internal services |
 | `GOOGLE_CLIENT_ID` | | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | | Google OAuth client secret |
 | `GOOGLE_REDIRECT_URL` | | Google OAuth redirect URL |
 
-### Extra Proxies
-
-Route specific subdomains directly to internal services without a tunnel client:
+### Example `.env`
 
 ```env
-
+GOTUNNEL_DOMAIN=demolocal.online
+GOTUNNEL_SECRET=your-super-secret-key-change-this
+GOTUNNEL_DB_TYPE=sqlite
+GOTUNNEL_SQLITE_DB_PATH=./data/gotunnel.db
+GOTUNNEL_ADMIN_PORT=8080
+GOTUNNEL_PROXY_PORT=80
+GOTUNNEL_ALLOW_REGISTRATION=true
+GOTUNNEL_AUTO_TLS=true
+GOTUNNEL_AUTO_TLS_EMAIL=admin@demolocal.online
+GOTUNNEL_AUTO_TLS_DIR=./data/certs
+GOTUNNEL_ZEROSSL_API_KEY=your-zerossl-api-key
+GOTUNNEL_EXTRA_PROXIES=ollama.demolocal.online=http://10.11.0.9:11434,grafana.demolocal.online=http://localhost:3000
 ```
 
-## Dashboard
+### Extra Proxies
 
-- **Dashboard** — Stats, active connections, tunnel list
-- **Tunnels** — Manage tunnels, reserve subdomains
-- **Setup & Install** — Client install instructions with your auth token pre-filled
-- **Settings** — Change password, regenerate auth token
-- **Request Logs** — Per-tunnel HTTP logs with method, path, status, and timing
+Route specific subdomains directly to internal services (no tunnel client needed):
+
+```env
+GOTUNNEL_EXTRA_PROXIES=ollama.demolocal.online=http://10.11.0.9:11434,grafana.demolocal.online=http://localhost:3000
+```
+
+Format: `subdomain=upstream,subdomain=upstream,...`
+
+Example: Access Ollama API without a tunnel client:
+```bash
+curl https://ollama.demolocal.online/api/models
+# → proxied to http://10.11.0.9:11434/api/models
+```
 
 ## Docker Deployment
 
+### Quick Start
 ```bash
-docker compose up -d          # Start
-docker compose logs -f        # Tail logs
-docker compose down           # Stop
-docker compose build --no-cache  # Rebuild (after code changes)
-```
-
-The Docker image cross-compiles all client binaries during build — no pre-built binaries needed in the repo.
-
-Data is persisted in the `gotunnel_data` Docker volume (contains SQLite DB and TLS certs).
-
-## Building from Source
-
-```bash
-# Prerequisites: Go 1.22+
-make deps           # Download dependencies
-make build          # Build server & client (bin/)
-make release-client # Cross-compile client for all platforms → downloads/
-make release-server # Build Linux server binaries → bin/
-```
-
-## Tech Stack
-
-- **Go 1.22** — Server and client
-- **gorilla/websocket** — Tunnel protocol
-- **modernc.org/sqlite** — Pure-Go SQLite (no CGO)
-- **golang.org/x/crypto/acme/autocert** — Auto-TLS (ZeroSSL / Let's Encrypt)
-- **Tailwind CSS** — Dashboard UI (CDN)
-- **html/template** + **embed** — Server-side rendering, assets embedded in binary
-
-## License
-
-MIT
-
-
-## Features
-
-- **Web Dashboard** — Register, login, manage tunnels, view request logs
-- **Multi-User** — Each user gets their own account, auth token, and tunnels
-- **Custom Subdomains** — Reserve subdomains for persistent URLs
-- **Request Inspection** — View real-time HTTP request logs with status codes and duration
-- **WebSocket Tunnels** — Efficient tunnel protocol over WebSocket (no SSH dependency)
-- **Single Binary** — Server and client are single Go binaries, zero runtime dependencies
-- **Docker Ready** — Deploy with `docker compose up` in minutes
-- **Automatic HTTPS** — Use with Caddy for auto TLS, or bring your own certificates
-- **Cross-Platform Client** — Works on Linux, macOS, and Windows
-
-## Architecture
-
-```
-┌─────────────┐          ┌──────────────────────────────────────┐
-│   Client     │ WebSocket│         GoTunnel Server               │
-│  (gotunnel)  │─────────▶│                                      │
-│              │          │  ┌──────────┐   ┌─────────────────┐  │
-│ localhost:   │◀─────────│  │ Tunnel   │   │  Web Dashboard  │  │
-│   3000       │  HTTP    │  │ Manager  │   │  (port 8080)    │  │
-└─────────────┘  Proxy   │  └────┬─────┘   └─────────────────┘  │
-                          │       │                               │
-                          │  ┌────▼─────┐   ┌─────────────────┐  │
-Internet ───────────────▶ │  │  Reverse  │   │    SQLite DB    │  │
-  *.demolocal.online      │  │  Proxy    │   │  (users,tunnels)│  │
-                          │  │ (port 80) │   └─────────────────┘  │
-                          │  └──────────┘                         │
-                          └──────────────────────────────────────┘
-```
-
-**How it works:**
-1. Client connects to server via WebSocket and authenticates
-2. Server registers the subdomain and routes incoming HTTP traffic
-3. When a request arrives for `myapp.demolocal.online`, the server forwards it through the WebSocket to the client
-4. Client proxies the request to the local service and sends the response back
-5. Server returns the response to the original requester
-
-## Quick Start
-
-### 1. Deploy the Server
-
-```bash
-# Clone the repo
-git clone <repo-url>
-cd gotunnel
-
-# Configure
-cp .env.example .env
-# Edit .env — set GOTUNNEL_DOMAIN and GOTUNNEL_SECRET
-
-# Run with Docker
 docker compose up -d
-
-# Or build and run directly
-make build
-./bin/gotunnel-server
+docker compose logs -f        # View logs
+docker compose down           # Stop
 ```
 
-### 2. Set Up DNS
-
-Add a wildcard A record pointing to your server:
-
-| Type | Name | Value |
-|------|------|-------|
-| A    | *    | `<your-server-ip>` |
-
-### 3. Create an Account
-
-Open `http://your-server:8080` in your browser and register an account.
-
-### 4. Install the Client
-
+### Rebuilding
 ```bash
-# Download the binary (or build from source)
-make build-client
-sudo mv bin/gotunnel /usr/local/bin/
-
-# Authenticate
-gotunnel auth <your-auth-token> --server your-server:8080
+docker compose build --no-cache
+docker compose up -d
 ```
 
-You can find your auth token in the Dashboard → Setup & Install page.
+The Docker image:
+- Cross-compiles all 5 client binaries during `docker build`
+- Exposes ports: **8080** (admin), **80** (ACME), **443** (tunnels & WSS)
+- Persists data in `gotunnel_data` volume (SQLite DB + TLS certs)
+- Pre-built binaries available at `/download/demolocal-*`
 
-### 5. Create a Tunnel
-
-```bash
-# Expose localhost:3000 as https://myapp.demolocal.online
-gotunnel myapp 3000
-
-# Expose an API
-gotunnel api 8080
-
-# With explicit server and token
-gotunnel myapp 3000 --server demolocal.online:8080 --token gt_abc123...
+### Data Persistence
+```yaml
+gotunnel_data:
+  - Contains SQLite database
+  - Contains TLS certificates (if auto-TLS enabled)
+  - Mounts to `/app/data` in container
 ```
-
-## Dashboard
-
-The web dashboard provides:
-
-- **Dashboard** — Overview with stats, active connections, and tunnel list
-- **Tunnels** — Manage tunnels, reserve subdomains, view status
-- **Setup & Install** — Client installation instructions with your auth token
-- **Settings** — Change password, regenerate auth token
-- **Request Logs** — Per-tunnel HTTP request logs with method, path, status, and timing
-
-## Server Configuration
-
-| Environment Variable | Default | Description |
-|---------------------|---------|-------------|
-| `GOTUNNEL_DOMAIN` | `demolocal.online` | Base domain for tunnels |
-| `GOTUNNEL_ADMIN_PORT` | `8080` | Admin dashboard port |
-| `GOTUNNEL_PROXY_PORT` | `80` | Public tunnel traffic port |
-| `GOTUNNEL_SECRET` | (required) | Secret key for sessions |
-| `GOTUNNEL_DB_PATH` | `./data/gotunnel.db` | SQLite database path |
-| `GOTUNNEL_ALLOW_REGISTRATION` | `true` | Enable public registration |
-| `GOTUNNEL_TLS_CERT` | | TLS certificate path |
-| `GOTUNNEL_TLS_KEY` | | TLS private key path |
-
-## Client Configuration
-
-The client stores config in `~/.gotunnel/config.json`:
-
-```json
-{
-  "server_url": "demolocal.online:8080",
-  "auth_token": "gt_abc123..."
-}
-```
-
-Commands:
-```bash
-gotunnel auth <token>           # Save auth token
-gotunnel auth <token> --server <url>  # Save token and server
-gotunnel config                 # Show current config
-gotunnel myapp 3000             # Create tunnel
-gotunnel --help                 # Show help
-```
-
-## Production Deployment with HTTPS
-
-For production, use Caddy as a reverse proxy for automatic HTTPS:
-
-1. Edit `Caddyfile` with your domain
-2. Uncomment the caddy service in `docker-compose.yml`
-3. Set DNS wildcard record
-4. Run `docker compose up -d`
-
-Caddy will automatically provision TLS certificates for your domain and all tunnel subdomains.
 
 ## Building from Source
 
+### Prerequisites
+- Go 1.22+
+- (Optional) `air` for live reload: `go install github.com/air-verse/air@latest`
+
+### Build Commands
+
 ```bash
-# Prerequisites: Go 1.22+
-make deps      # Download dependencies
-make build     # Build server & client
-make release   # Build for all platforms
+# Install dependencies
+make deps
+
+# Build server & client for current platform
+make build
+
+# Cross-compile client for all platforms
+make release-client
+
+# Build Linux server binaries
+make release-server
+
+# Development with hot reload
+make run-server
 ```
 
-## Development
-
+### Manual Build
 ```bash
-# Run server in dev mode
-make run-server
+# Build just the client
+CGO_ENABLED=0 go build -o demolocal ./cmd/client
 
-# Run client
-go run ./cmd/client myapp 3000 --server localhost:8080 --token <token>
+# Build for a specific platform
+GOOS=linux GOARCH=amd64 go build -o demolocal-linux ./cmd/client
+GOOS=darwin GOARCH=arm64 go build -o demolocal-macos ./cmd/client
+GOOS=windows GOARCH=amd64 go build -o demolocal.exe ./cmd/client
+
+# Build server
+go build -o gotunnel-server ./cmd/server
 ```
 
 ## Tech Stack
 
-- **Go** — Server and client
-- **WebSocket** — Tunnel protocol (gorilla/websocket)
-- **SQLite** — Database (modernc.org/sqlite, pure Go)
+- **Go 1.22** — Language, server & client
+- **gorilla/websocket** — Secure WSS tunnel protocol
+- **modernc.org/sqlite** — Pure-Go SQLite (zero CGO)
+- **golang.org/x/crypto/acme/autocert** — Automatic HTTPS (ACME)
+- **ZeroSSL** — External Account Binding (EAB) for ACME
+- **Google OAuth 2.0** — Sign-in integration
 - **Tailwind CSS** — Dashboard UI (via CDN)
-- **html/template** — Server-side rendering
-- **embed** — Templates and static files embedded in binary
+- **html/template + embed** — Templates & assets embedded in binary
+
+## Performance & Security
+
+- **Firewall-Friendly** — Uses port 443 (HTTPS), not SSH or other protocols
+- **Zero Overhead** — Single Go binary, minimal memory/CPU footprint
+- **Connection Pooling** — Reuses HTTP connections where possible
+- **HTTPS Everywhere** — Auto-TLS with ZeroSSL/Let's Encrypt
+- **Token Validation** — Every request validated server-side
+- **Session Encryption** — Secure cookies (same-site, http-only)
+
+## Troubleshooting
+
+### Client can't connect
+```bash
+# Test connectivity
+curl -k https://demolocal.online/health
+
+# Or test direct IP
+curl -k https://<server-ip>:443
+```
+
+### Tunnel shows online but requests timeout
+Ensure your local service is running:
+```bash
+netstat -an | grep 3000
+telnet localhost 3000
+```
+
+### TLS certificate errors
+1. Verify DNS resolves to your server IP
+2. Ensure port 80 is open for ACME challenges
+3. Check `GOTUNNEL_AUTO_TLS_EMAIL` is correct
+4. Review logs: `docker compose logs gotunnel | grep -i tls`
+
+## Contributing
+
+Contributions welcome! Please fork, create a feature branch, test locally, and submit a PR.
 
 ## License
 
-MIT
+MIT — See [LICENSE](LICENSE) for details.
+
+## Support
+
+- **Documentation** — https://demolocal.online
+- **Issues** — https://github.com/adisaputra10/ngrok/issues
+- **Dashboard** — https://demolocal.online:8080
