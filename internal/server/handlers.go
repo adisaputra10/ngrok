@@ -172,11 +172,11 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 
 	// Only allow known binary filenames (prevent directory traversal)
 	allowed := map[string]bool{
-		"gotunnel-linux-amd64":       true,
-		"gotunnel-linux-arm64":       true,
-		"gotunnel-darwin-amd64":      true,
-		"gotunnel-darwin-arm64":      true,
-		"gotunnel-windows-amd64.exe": true,
+		"demolocal-linux-amd64":       true,
+		"demolocal-linux-arm64":       true,
+		"demolocal-darwin-amd64":      true,
+		"demolocal-darwin-arm64":      true,
+		"demolocal-windows-amd64.exe": true,
 	}
 	if !allowed[filename] {
 		http.Error(w, "Not Found", http.StatusNotFound)

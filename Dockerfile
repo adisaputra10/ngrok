@@ -19,11 +19,11 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 
 # Cross-compile client binaries for all platforms
 RUN mkdir -p /downloads && \
-    CGO_ENABLED=0 GOOS=linux   GOARCH=amd64  go build -ldflags="-s -w" -o /downloads/gotunnel-linux-amd64   ./cmd/client && \
-    CGO_ENABLED=0 GOOS=linux   GOARCH=arm64  go build -ldflags="-s -w" -o /downloads/gotunnel-linux-arm64   ./cmd/client && \
-    CGO_ENABLED=0 GOOS=darwin  GOARCH=amd64  go build -ldflags="-s -w" -o /downloads/gotunnel-darwin-amd64  ./cmd/client && \
-    CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64  go build -ldflags="-s -w" -o /downloads/gotunnel-darwin-arm64  ./cmd/client && \
-    CGO_ENABLED=0 GOOS=windows GOARCH=amd64  go build -ldflags="-s -w" -o /downloads/gotunnel-windows-amd64.exe ./cmd/client
+    CGO_ENABLED=0 GOOS=linux   GOARCH=amd64  go build -ldflags="-s -w" -o /downloads/demolocal-linux-amd64   ./cmd/client && \
+    CGO_ENABLED=0 GOOS=linux   GOARCH=arm64  go build -ldflags="-s -w" -o /downloads/demolocal-linux-arm64   ./cmd/client && \
+    CGO_ENABLED=0 GOOS=darwin  GOARCH=amd64  go build -ldflags="-s -w" -o /downloads/demolocal-darwin-amd64  ./cmd/client && \
+    CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64  go build -ldflags="-s -w" -o /downloads/demolocal-darwin-arm64  ./cmd/client && \
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64  go build -ldflags="-s -w" -o /downloads/demolocal-windows-amd64.exe ./cmd/client
 
 # Runtime stage
 FROM alpine:3.19

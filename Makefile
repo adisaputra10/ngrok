@@ -7,7 +7,7 @@ build-server:
 	go build -o bin/gotunnel-server ./cmd/server
 
 build-client:
-	go build -o bin/gotunnel ./cmd/client
+	go build -o bin/demolocal ./cmd/client
 
 # Run in development mode
 run-server:
@@ -38,11 +38,11 @@ release-server:
 # Build client binaries for all platforms (served as downloads)
 release-client:
 	@mkdir -p downloads
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o downloads/gotunnel-linux-amd64 ./cmd/client
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o downloads/gotunnel-linux-arm64 ./cmd/client
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o downloads/gotunnel-darwin-amd64 ./cmd/client
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o downloads/gotunnel-darwin-arm64 ./cmd/client
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o downloads/gotunnel-windows-amd64.exe ./cmd/client
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o downloads/demolocal-linux-amd64 ./cmd/client
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o downloads/demolocal-linux-arm64 ./cmd/client
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o downloads/demolocal-darwin-amd64 ./cmd/client
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o downloads/demolocal-darwin-arm64 ./cmd/client
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o downloads/demolocal-windows-amd64.exe ./cmd/client
 
 # Build everything
 release: release-server release-client

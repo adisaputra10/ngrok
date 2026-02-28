@@ -41,7 +41,7 @@ func main() {
 	switch args[0] {
 	case "auth":
 		if len(args) < 2 {
-			fmt.Println("Usage: gotunnel auth <token>")
+			fmt.Println("Usage: demolocal auth <token>")
 			os.Exit(1)
 		}
 		handleAuth(args[1])
@@ -50,7 +50,7 @@ func main() {
 		handleConfigShow()
 		return
 	case "version", "--version", "-v":
-		fmt.Printf("gotunnel v%s\n", version)
+		fmt.Printf("demolocal v%s\n", version)
 		return
 	case "help", "--help", "-h":
 		printUsage()
@@ -92,8 +92,8 @@ func main() {
 	if config.ServerURL == "" || config.AuthToken == "" {
 		fmt.Println("Error: Server URL and auth token required.")
 		fmt.Println()
-		fmt.Println("Run: gotunnel auth <token> --server <server-url>")
-		fmt.Println("Or use: gotunnel <subdomain> <port> --server <url> --token <token>")
+		fmt.Println("Run: demolocal auth <token> --server <server-url>")
+		fmt.Println("Or use: demolocal <subdomain> <port> --server <url> --token <token>")
 		os.Exit(1)
 	}
 
@@ -101,28 +101,28 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Printf(`gotunnel v%s — Expose local services to the internet
+	fmt.Printf(`demolocal v%s — Expose local services to the internet
 
 Usage:
-  gotunnel <subdomain> <port> [options]
-  gotunnel auth <token>                   Save auth token
-  gotunnel config                         Show current config
+  demolocal <subdomain> <port> [options]
+  demolocal auth <token>                  Save auth token
+  demolocal config                        Show current config
 
 Options:
-  --server <url>    Server URL (e.g., tunnel.example.com:8080)
+  --server <url>    Server URL (e.g., demolocal.online:8080)
   --token <token>   Auth token (overrides saved config)
   --version, -v     Show version
   --help, -h        Show help
 
 Examples:
-  gotunnel myapp 3000                     https://myapp.tunnel.example.com → localhost:3000
-  gotunnel api 8080 --server my.server:8080 --token gt_abc123...
+  demolocal myapp 3000                    https://myapp.demolocal.online → localhost:3000
+  demolocal api 8080 --server demolocal.online:8080 --token gt_abc123...
 `, version)
 }
 
 func configDir() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".gotunnel")
+	return filepath.Join(home, ".demolocal")
 }
 
 func configPath() string {
@@ -196,7 +196,7 @@ func handleConfigShow() {
 
 func startTunnel(config Config, subdomain, localPort string) {
 	fmt.Println()
-	fmt.Printf("GoTunnel v%s\n", version)
+	fmt.Printf("Demolocal v%s\n", version)
 	fmt.Println()
 	fmt.Printf("Connecting to %s...\n", config.ServerURL)
 

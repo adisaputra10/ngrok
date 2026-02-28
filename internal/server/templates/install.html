@@ -1,4 +1,4 @@
-{{define "title"}}Setup & Install — GoTunnel{{end}}
+{{define "title"}}Setup & Install — Demolocal{{end}}
 {{define "body"}}
 <div class="flex min-h-screen">
     {{template "sidebar" .}}
@@ -6,7 +6,7 @@
     <main class="flex-1 p-8">
         <div class="mb-8">
             <h1 class="text-2xl font-bold">Setup & Install</h1>
-            <p class="text-gray-400 mt-1">Install the GoTunnel client on your machine</p>
+            <p class="text-gray-400 mt-1">Install the Demolocal client on your machine</p>
         </div>
 
         {{$data := .Data}}
@@ -31,32 +31,32 @@
 
                 <div id="install-linux" class="bg-gray-900 rounded-lg p-4 font-mono text-sm">
                     <div class="text-gray-400 mb-2"># Download the latest binary (amd64)</div>
-                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/gotunnel-linux-amd64 -o gotunnel</div>
-                    <div class="text-green-400 select-all mt-1">chmod +x gotunnel</div>
-                    <div class="text-green-400 select-all mt-1">sudo mv gotunnel /usr/local/bin/</div>
+                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/demolocal-linux-amd64 -o demolocal</div>
+                    <div class="text-green-400 select-all mt-1">chmod +x demolocal</div>
+                    <div class="text-green-400 select-all mt-1">sudo mv demolocal /usr/local/bin/</div>
                     <div class="text-gray-400 mt-3"># For ARM64 (Raspberry Pi, etc.)</div>
-                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/gotunnel-linux-arm64 -o gotunnel</div>
+                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/demolocal-linux-arm64 -o demolocal</div>
                 </div>
 
                 <div id="install-mac" class="bg-gray-900 rounded-lg p-4 font-mono text-sm hidden">
                     <div class="text-gray-400 mb-2"># Apple Silicon (M1/M2/M3)</div>
-                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/gotunnel-darwin-arm64 -o gotunnel</div>
-                    <div class="text-green-400 select-all mt-1">chmod +x gotunnel</div>
-                    <div class="text-green-400 select-all mt-1">sudo mv gotunnel /usr/local/bin/</div>
+                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/demolocal-darwin-arm64 -o demolocal</div>
+                    <div class="text-green-400 select-all mt-1">chmod +x demolocal</div>
+                    <div class="text-green-400 select-all mt-1">sudo mv demolocal /usr/local/bin/</div>
                     <div class="text-gray-400 mt-3"># Intel Mac</div>
-                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/gotunnel-darwin-amd64 -o gotunnel</div>
+                    <div class="text-green-400 select-all">curl -fsSL https://{{$data.Domain}}/download/demolocal-darwin-amd64 -o demolocal</div>
                 </div>
 
                 <div id="install-windows" class="bg-gray-900 rounded-lg p-4 font-mono text-sm hidden">
                     <div class="text-gray-400 mb-2"># Download the Windows binary</div>
-                    <div class="text-green-400 select-all">Invoke-WebRequest -Uri "https://{{$data.Domain}}/download/gotunnel-windows-amd64.exe" -OutFile "gotunnel.exe"</div>
+                    <div class="text-green-400 select-all">Invoke-WebRequest -Uri "https://{{$data.Domain}}/download/demolocal-windows-amd64.exe" -OutFile "demolocal.exe"</div>
                     <div class="text-gray-400 mt-3"># Or build from source</div>
-                    <div class="text-green-400 select-all">go install gotunnel/cmd/client@latest</div>
+                    <div class="text-green-400 select-all">go install github.com/adisaputra10/ngrok/cmd/client@latest</div>
                 </div>
 
                 <div id="install-docker" class="bg-gray-900 rounded-lg p-4 font-mono text-sm hidden">
                     <div class="text-gray-400 mb-2"># Run as Docker container</div>
-                    <div class="text-green-400 select-all">docker run --rm -it gotunnel/client myapp 3000 \</div>
+                    <div class="text-green-400 select-all">docker run --rm -it demolocal/client myapp 3000 \</div>
                     <div class="text-green-400 select-all">  --server {{$data.Domain}}:{{$data.AdminPort}} \</div>
                     <div class="text-green-400 select-all">  --token {{$data.AuthToken}}</div>
                 </div>
@@ -73,10 +73,10 @@
 
                 <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm mb-4">
                     <div class="text-gray-400"># Login with your auth token</div>
-                    <div class="text-green-400 select-all">gotunnel auth {{$data.AuthToken}}</div>
+                    <div class="text-green-400 select-all">demolocal auth {{$data.AuthToken}}</div>
                 </div>
 
-                <p class="text-gray-400 text-sm">Or create a config file at <code class="bg-gray-800 px-1.5 py-0.5 rounded text-xs">~/.gotunnel/config.yml</code>:</p>
+                <p class="text-gray-400 text-sm">Or create a config file at <code class="bg-gray-800 px-1.5 py-0.5 rounded text-xs">~/.demolocal/config.json</code>:</p>
 
                 <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm mt-3">
                     <div class="text-blue-400">server:</div>
@@ -102,18 +102,18 @@
                 <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm space-y-4">
                     <div>
                         <div class="text-gray-400"># Expose a web server on port 3000</div>
-                        <div class="text-green-400 select-all">gotunnel myapp 3000</div>
+                        <div class="text-green-400 select-all">demolocal myapp 3000</div>
                         <div class="text-gray-500 mt-1"># → https://myapp.{{$data.Domain}}</div>
                     </div>
                     <div>
                         <div class="text-gray-400"># Expose an API on port 8080</div>
-                        <div class="text-green-400 select-all">gotunnel api 8080</div>
+                        <div class="text-green-400 select-all">demolocal api 8080</div>
                         <div class="text-gray-500 mt-1"># → https://api.{{$data.Domain}}</div>
                     </div>
                     <div>
                         <div class="text-gray-400"># Multiple tunnels at once</div>
-                        <div class="text-green-400 select-all">gotunnel frontend 3000 &</div>
-                        <div class="text-green-400 select-all">gotunnel backend 8080 &</div>
+                        <div class="text-green-400 select-all">demolocal frontend 3000 &</div>
+                        <div class="text-green-400 select-all">demolocal backend 8080 &</div>
                     </div>
                 </div>
             </div>
