@@ -34,11 +34,12 @@ COPY --from=builder /gotunnel /app/gotunnel
 RUN mkdir -p /app/data
 
 # Environment defaults
-ENV GOTUNNEL_DB_PATH=/app/data/gotunnel.db
+ENV GOTUNNEL_DB_TYPE=sqlite
+ENV GOTUNNEL_SQLITE_DB_PATH=/app/data/gotunnel.db
 ENV GOTUNNEL_ADMIN_PORT=8080
 ENV GOTUNNEL_PROXY_PORT=80
 
-EXPOSE 8080 80
+EXPOSE 8080 80 443
 
 VOLUME ["/app/data"]
 

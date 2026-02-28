@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -123,9 +124,8 @@ func (s *Server) StartServers() error {
 // startWithAutoTLS starts servers with automatic certificate management (ZeroSSL or Let's Encrypt)
 func (s *Server) startWithAutoTLS(adminHandler, proxyHandler http.Handler) error {
 	domain := s.config.Domain
-	wildcardDomain := "*." + domain
 
-	log.Printf("[tls] Auto-TLS enabled for %s and %s", domain, wildcardDomain)
+	log.Printf("[tls] Auto-TLS enabled for %s and *.%s", domain, domain)
 	log.Printf("[tls] Certificate cache: %s", s.config.AutoTLSDir)
 
 	// Configure ACME client
@@ -161,9 +161,15 @@ func (s *Server) startWithAutoTLS(adminHandler, proxyHandler http.Handler) error
 	}
 
 	certManager := &autocert.Manager{
-		Prompt:                 autocert.AcceptTOS,
-		Cache:                  autocert.DirCache(s.config.AutoTLSDir),
-		HostPolicy:             autocert.HostWhitelist(domain, wildcardDomain),
+		Prompt: autocert.AcceptTOS,
+		Cache:  autocert.DirCache(s.config.AutoTLSDir),
+		// Allow main domain and any subdomain (individual certs issued on-demand per subdomain)
+		HostPolicy: func(ctx context.Context, host string) error {
+			if host == domain || strings.HasSuffix(host, "."+domain) {
+				return nil
+			}
+			return fmt.Errorf("[tls] hostname %q not allowed", host)
+		},
 		Email:                  s.config.AutoTLSEmail,
 		Client:                 acmeClient,
 		ExternalAccountBinding: eab,
