@@ -13,11 +13,17 @@ RUN go mod download
 # Copy source
 COPY . .
 
-# Build server
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /gotunnel-server ./cmd/server
+# Build server (linux/amd64 – the container target)
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o /gotunnel-server ./cmd/server
 
-# Build client
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /gotunnel ./cmd/client
+# Cross-compile client binaries for all platforms
+RUN mkdir -p /downloads && \
+    CGO_ENABLED=0 GOOS=linux   GOARCH=amd64  go build -ldflags="-s -w" -o /downloads/gotunnel-linux-amd64   ./cmd/client && \
+    CGO_ENABLED=0 GOOS=linux   GOARCH=arm64  go build -ldflags="-s -w" -o /downloads/gotunnel-linux-arm64   ./cmd/client && \
+    CGO_ENABLED=0 GOOS=darwin  GOARCH=amd64  go build -ldflags="-s -w" -o /downloads/gotunnel-darwin-amd64  ./cmd/client && \
+    CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64  go build -ldflags="-s -w" -o /downloads/gotunnel-darwin-arm64  ./cmd/client && \
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64  go build -ldflags="-s -w" -o /downloads/gotunnel-windows-amd64.exe ./cmd/client
 
 # Runtime stage
 FROM alpine:3.19
@@ -26,12 +32,14 @@ RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-# Copy binaries
+# Copy server binary
 COPY --from=builder /gotunnel-server /app/gotunnel-server
-COPY --from=builder /gotunnel /app/gotunnel
+
+# Copy pre-built client binaries so /download/ route works
+COPY --from=builder /downloads /app/downloads
 
 # Create data directory
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data /app/data/certs
 
 # Environment defaults
 ENV GOTUNNEL_DB_TYPE=sqlite
