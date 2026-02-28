@@ -2,6 +2,9 @@ bin/
 data/
 *.db
 .env
-*.exe
 *.log
 __debug_bin*
+
+# Track downloads directory (pre-built client binaries for serving)
+!downloads/
+!downloads/*
