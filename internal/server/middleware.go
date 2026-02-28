@@ -11,6 +11,11 @@ import (
 // withLogging adds request logging middleware
 func (s *Server) withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip wrapping for WebSocket upgrades — the Hijacker interface must not be obscured
+		if r.Header.Get("Upgrade") == "websocket" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		start := time.Now()
 		wrapped := &statusWriter{ResponseWriter: w, status: 200}
 		next.ServeHTTP(wrapped, r)
