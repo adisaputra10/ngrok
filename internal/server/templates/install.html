@@ -74,14 +74,14 @@
                 <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm mb-4">
                     <div class="text-gray-400"># One command — token saved, ready to tunnel</div>
                     <div class="text-green-400 select-all">demolocal auth {{$data.AuthToken}}</div>
-                    <div class="text-gray-500 mt-2"># Saves to ~/.demolocal/config.json (server: {{$data.Domain}}:{{$data.AdminPort}})</div>
+                    <div class="text-gray-500 mt-2"># Saves to ~/.demolocal/config.json (server: {{$data.Domain}})</div>
                 </div>
 
                 <p class="text-gray-400 text-sm">Or manually create <code class="bg-gray-800 px-1.5 py-0.5 rounded text-xs">~/.demolocal/config.json</code>:</p>
 
                 <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm mt-3">
                     <div class="text-gray-300">{</div>
-                    <div class="text-blue-400 ml-4">"server_url": <span class="text-green-400 select-all">"{{$data.Domain}}:{{$data.AdminPort}}"</span>,</div>
+                    <div class="text-blue-400 ml-4">"server_url": <span class="text-green-400 select-all">"{{$data.Domain}}"</span>,</div>
                     <div class="text-blue-400 ml-4">"auth_token": <span class="text-green-400 select-all">"{{$data.AuthToken}}"</span></div>
                     <div class="text-gray-300">}</div>
                 </div>

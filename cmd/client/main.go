@@ -24,8 +24,8 @@ import (
 const version = "1.0.0"
 
 // defaultServerURL is the pre-configured server for demolocal.online.
-// Users can override it with --server or by editing ~/.demolocal/config.json.
-const defaultServerURL = "demolocal.online:8080"
+// Uses wss:// (port 443) automatically when no port is specified.
+const defaultServerURL = "demolocal.online"
 
 // Config holds client configuration
 type Config struct {
@@ -113,7 +113,7 @@ Usage:
   demolocal config                        Show current config
 
 Options:
-  --server <url>    Override server URL (default: demolocal.online:8080)
+  --server <url>    Override server URL (default: demolocal.online via wss://)
   --token <token>   Auth token (overrides saved config)
   --version, -v     Show version
   --help, -h        Show help
@@ -122,6 +122,7 @@ Examples:
   demolocal auth gt_abc123...             # Save token, ready to tunnel
   demolocal myapp 3000                    # https://myapp.demolocal.online → localhost:3000
   demolocal api 8080                      # https://api.demolocal.online → localhost:8080
+  demolocal myapp 3000 --server localhost:8080  # local dev (ws://)
 `, version)
 }
 
@@ -181,7 +182,8 @@ func handleAuth(token string) {
 	fmt.Printf("  Server: %s\n", config.ServerURL)
 	fmt.Println()
 	fmt.Println("You can now create tunnels:")
-	fmt.Printf("  demolocal myapp 3000    # → https://myapp.%s\n", strings.SplitN(config.ServerURL, ":", 2)[0])
+	hostname := strings.SplitN(config.ServerURL, ":", 2)[0]
+	fmt.Printf("  demolocal myapp 3000    # → https://myapp.%s\n", hostname)
 }
 
 func handleConfigShow() {
@@ -204,15 +206,26 @@ func startTunnel(config Config, subdomain, localPort string) {
 	fmt.Println()
 	fmt.Printf("Demolocal v%s\n", version)
 	fmt.Println()
-	fmt.Printf("Connecting to %s...\n", config.ServerURL)
+	fmt.Printf("Connecting to %s...", config.ServerURL)
 
-	// Build WebSocket URL
-	serverHost := config.ServerURL
-	if !strings.Contains(serverHost, "://") {
-		serverHost = "ws://" + serverHost
+	// Build WebSocket URL:
+	//   - already has scheme (ws:// / wss://)  → use as-is
+	//   - host:port (has colon+digits at end)  → ws://host:port  (plain, for local/dev)
+	//   - plain domain (no port, no scheme)    → wss://domain    (TLS, for production)
+	var serverHost string
+	switch {
+	case strings.Contains(config.ServerURL, "://"):
+		serverHost = config.ServerURL
+		serverHost = strings.Replace(serverHost, "https://", "wss://", 1)
+		serverHost = strings.Replace(serverHost, "http://", "ws://", 1)
+	case strings.Contains(config.ServerURL, ":"):
+		// host:port — assume plain WS (local/dev usage)
+		serverHost = "ws://" + config.ServerURL
+	default:
+		// plain domain — use WSS (TLS on port 443)
+		serverHost = "wss://" + config.ServerURL
 	}
-	serverHost = strings.Replace(serverHost, "https://", "wss://", 1)
-	serverHost = strings.Replace(serverHost, "http://", "ws://", 1)
+	fmt.Printf(" (%s)\n", serverHost)
 
 	wsURL := fmt.Sprintf("%s/ws/tunnel?token=%s", serverHost, url.QueryEscape(config.AuthToken))
 
