@@ -236,7 +236,7 @@ GOTUNNEL_AUTO_TLS=true
 GOTUNNEL_AUTO_TLS_EMAIL=admin@demolocal.online
 GOTUNNEL_AUTO_TLS_DIR=./data/certs
 GOTUNNEL_ZEROSSL_API_KEY=your-zerossl-api-key
-GOTUNNEL_EXTRA_PROXIES=ollama.demolocal.online=http://10.11.0.9:11434,grafana.demolocal.online=http://localhost:3000
+GOTUNNEL_EXTRA_PROXIES= 
 ```
 
 ### Extra Proxies
@@ -244,14 +244,14 @@ GOTUNNEL_EXTRA_PROXIES=ollama.demolocal.online=http://10.11.0.9:11434,grafana.de
 Route specific subdomains directly to internal services (no tunnel client needed):
 
 ```env
-GOTUNNEL_EXTRA_PROXIES=ollama.demolocal.online=http://10.11.0.9:11434,grafana.demolocal.online=http://localhost:3000
+GOTUNNEL_EXTRA_PROXIES=o
 ```
 
 Format: `subdomain=upstream,subdomain=upstream,...`
 
-Example: Access Ollama API without a tunnel client:
+Example: Access  API without a tunnel client:
 ```bash
-curl https://ollama.demolocal.online/api/models
+
 # → proxied to http://10.11.0.9:11434/api/models
 ```
 

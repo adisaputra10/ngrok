@@ -145,6 +145,11 @@ func loadConfig() Config {
 	if config.ServerURL == "" {
 		config.ServerURL = defaultServerURL
 	}
+	// Migrate legacy configs that have port appended (e.g. demolocal.online:8080 → demolocal.online)
+	// Port 8080/80 are admin/HTTP ports; production tunnels use WSS on 443 (no port needed)
+	if strings.HasSuffix(config.ServerURL, ":8080") || strings.HasSuffix(config.ServerURL, ":80") {
+		config.ServerURL = config.ServerURL[:strings.LastIndex(config.ServerURL, ":")]
+	}
 	return config
 }
 
@@ -210,16 +215,20 @@ func startTunnel(config Config, subdomain, localPort string) {
 
 	// Build WebSocket URL:
 	//   - already has scheme (ws:// / wss://)  → use as-is
-	//   - host:port (has colon+digits at end)  → ws://host:port  (plain, for local/dev)
-	//   - plain domain (no port, no scheme)    → wss://domain    (TLS, for production)
+	//   - host:443                             → wss://host
+	//   - host:port (other ports)              → ws://host:port  (local/dev)
+	//   - plain domain (no port, no scheme)    → wss://domain    (production, port 443)
 	var serverHost string
 	switch {
 	case strings.Contains(config.ServerURL, "://"):
 		serverHost = config.ServerURL
 		serverHost = strings.Replace(serverHost, "https://", "wss://", 1)
 		serverHost = strings.Replace(serverHost, "http://", "ws://", 1)
+	case strings.HasSuffix(config.ServerURL, ":443"):
+		// Explicit port 443 — use wss:// without the port
+		serverHost = "wss://" + strings.TrimSuffix(config.ServerURL, ":443")
 	case strings.Contains(config.ServerURL, ":"):
-		// host:port — assume plain WS (local/dev usage)
+		// host:port (non-443) — plain WS for local/dev
 		serverHost = "ws://" + config.ServerURL
 	default:
 		// plain domain — use WSS (TLS on port 443)
