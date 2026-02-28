@@ -23,6 +23,10 @@ import (
 
 const version = "1.0.0"
 
+// defaultServerURL is the pre-configured server for demolocal.online.
+// Users can override it with --server or by editing ~/.demolocal/config.json.
+const defaultServerURL = "demolocal.online:8080"
+
 // Config holds client configuration
 type Config struct {
 	ServerURL string `json:"server_url"`
@@ -89,11 +93,11 @@ func main() {
 		config.AuthToken = authToken
 	}
 
-	if config.ServerURL == "" || config.AuthToken == "" {
-		fmt.Println("Error: Server URL and auth token required.")
+	if config.AuthToken == "" {
+		fmt.Println("Error: auth token not set.")
 		fmt.Println()
-		fmt.Println("Run: demolocal auth <token> --server <server-url>")
-		fmt.Println("Or use: demolocal <subdomain> <port> --server <url> --token <token>")
+		fmt.Println("Run: demolocal auth <your-token>")
+		fmt.Println("Find your token at: https://demolocal.online/dashboard/install")
 		os.Exit(1)
 	}
 
@@ -105,18 +109,19 @@ func printUsage() {
 
 Usage:
   demolocal <subdomain> <port> [options]
-  demolocal auth <token>                  Save auth token
+  demolocal auth <token>                  Save auth token (server: demolocal.online)
   demolocal config                        Show current config
 
 Options:
-  --server <url>    Server URL (e.g., demolocal.online:8080)
+  --server <url>    Override server URL (default: demolocal.online:8080)
   --token <token>   Auth token (overrides saved config)
   --version, -v     Show version
   --help, -h        Show help
 
 Examples:
-  demolocal myapp 3000                    https://myapp.demolocal.online → localhost:3000
-  demolocal api 8080 --server demolocal.online:8080 --token gt_abc123...
+  demolocal auth gt_abc123...             # Save token, ready to tunnel
+  demolocal myapp 3000                    # https://myapp.demolocal.online → localhost:3000
+  demolocal api 8080                      # https://api.demolocal.online → localhost:8080
 `, version)
 }
 
@@ -130,12 +135,15 @@ func configPath() string {
 }
 
 func loadConfig() Config {
-	config := Config{}
+	config := Config{ServerURL: defaultServerURL}
 	data, err := os.ReadFile(configPath())
 	if err != nil {
 		return config
 	}
 	json.Unmarshal(data, &config)
+	if config.ServerURL == "" {
+		config.ServerURL = defaultServerURL
+	}
 	return config
 }
 
@@ -155,17 +163,12 @@ func handleAuth(token string) {
 	config := loadConfig()
 	config.AuthToken = token
 
-	// Check for --server flag
+	// Allow --server override; otherwise keep defaultServerURL from loadConfig
 	for i, arg := range os.Args {
 		if arg == "--server" && i+1 < len(os.Args) {
 			config.ServerURL = os.Args[i+1]
 			break
 		}
-	}
-
-	if config.ServerURL == "" {
-		fmt.Print("Server URL (e.g., tunnel.example.com:8080): ")
-		fmt.Scanln(&config.ServerURL)
 	}
 
 	if err := saveConfig(config); err != nil {
@@ -176,6 +179,9 @@ func handleAuth(token string) {
 	fmt.Println("✓ Auth token saved")
 	fmt.Printf("  Config: %s\n", configPath())
 	fmt.Printf("  Server: %s\n", config.ServerURL)
+	fmt.Println()
+	fmt.Println("You can now create tunnels:")
+	fmt.Printf("  demolocal myapp 3000    # → https://myapp.%s\n", strings.SplitN(config.ServerURL, ":", 2)[0])
 }
 
 func handleConfigShow() {
