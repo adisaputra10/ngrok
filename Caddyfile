@@ -22,5 +22,5 @@
 
 # Ollama AI API
 ollama.demolocal.online {
-    reverse_proxy localhost:11434
+    reverse_proxy 43.129.49.66:11434
 }
