@@ -106,6 +106,68 @@ func (s *Service) Register(email, username, password string) (*models.User, erro
 	return user, nil
 }
 
+// RegisterOAuth creates a new user account for OAuth login (no password required)
+func (s *Service) RegisterOAuth(email, displayName string) (*models.User, error) {
+	email = strings.TrimSpace(strings.ToLower(email))
+
+	if len(email) < 3 || !strings.Contains(email, "@") {
+		return nil, fmt.Errorf("invalid email address")
+	}
+
+	// Derive a safe username from the email local part
+	username := sanitizeUsername(strings.Split(email, "@")[0])
+	if len(username) < 3 {
+		username = "user" + username
+	}
+
+	// Ensure username is unique by appending a suffix if taken
+	base := username
+	for i := 1; i <= 99; i++ {
+		if _, err := s.db.GetUserByUsername(username); err != nil {
+			break // username is available
+		}
+		username = fmt.Sprintf("%s%d", base, i)
+	}
+
+	// Use a random unguessable password hash (user cannot use password login)
+	randomBytes := make([]byte, 32)
+	rand.Read(randomBytes)
+	hash, _ := HashPassword(hex.EncodeToString(randomBytes))
+
+	authToken := GenerateAuthToken()
+
+	user, err := s.db.CreateUser(email, username, hash, authToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	// Make first user an admin
+	count, _ := s.db.UserCount()
+	if count == 1 {
+		s.db.UpdateUserAdmin(user.ID, true)
+		user.IsAdmin = true
+	}
+
+	return user, nil
+}
+
+// sanitizeUsername converts a string to a valid username
+func sanitizeUsername(s string) string {
+	var result []byte
+	for i := 0; i < len(s) && i < 32; i++ {
+		c := s[i]
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' {
+			result = append(result, c)
+		} else if c >= 'A' && c <= 'Z' {
+			result = append(result, c+32) // lowercase
+		}
+	}
+	if len(result) == 0 {
+		return "user"
+	}
+	return string(result)
+}
+
 // Login authenticates a user and creates a session
 func (s *Service) Login(emailOrUsername, password string) (*models.User, string, error) {
 	emailOrUsername = strings.TrimSpace(strings.ToLower(emailOrUsername))

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -95,21 +97,17 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	// Find or create user
 	user, err := s.db.GetUserByEmail(googleUser.Email)
 	if err != nil {
-		// User doesn't exist, create new one
+		// User doesn't exist, create new one via OAuth path (no password required)
 		if !s.config.AllowRegistration {
 			http.Error(w, "Registration is disabled", http.StatusForbidden)
 			return
 		}
 
-		user, err = s.authService.Register(googleUser.Email, googleUser.Name, "")
+		user, err = s.authService.RegisterOAuth(googleUser.Email, googleUser.Name)
 		if err != nil {
-			// User might already exist (race condition), try to get again
-			user, err = s.db.GetUserByEmail(googleUser.Email)
-			if err != nil {
-				log.Printf("[oauth] Failed to create user: %v", err)
-				http.Error(w, "Failed to create user account", http.StatusInternalServerError)
-				return
-			}
+			log.Printf("[oauth] Failed to create user: %v", err)
+			http.Error(w, "Failed to create user account: "+err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -202,12 +200,9 @@ func getGoogleUserInfo(accessToken string) (*GoogleUserInfo, error) {
 	return &userInfo, nil
 }
 
-// generateRandomString generates a random string for state parameter
+// generateRandomString generates a cryptographically random hex string
 func generateRandomString(length int) string {
-	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	result := make([]byte, length)
-	for i := range result {
-		result[i] = chars[i%len(chars)]
-	}
-	return string(result)
+	bytes := make([]byte, length/2+1)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)[:length]
 }
