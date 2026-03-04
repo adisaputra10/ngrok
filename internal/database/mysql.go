@@ -107,6 +107,35 @@ func (db *MySQLDB) migrate() error {
 			INDEX idx_tunnel_id (tunnel_id),
 			INDEX idx_created (created_at)
 		)`,
+		`CREATE TABLE IF NOT EXISTS uptime_monitors (
+			id BIGINT PRIMARY KEY AUTO_INCREMENT,
+			user_id BIGINT NOT NULL,
+			name VARCHAR(255) NOT NULL,
+			url TEXT NOT NULL,
+			check_type VARCHAR(50) NOT NULL DEFAULT 'http',
+			interval_min INT NOT NULL DEFAULT 5,
+			timeout_sec INT NOT NULL DEFAULT 10,
+			expected_code INT NOT NULL DEFAULT 200,
+			enabled BOOLEAN DEFAULT TRUE,
+			status VARCHAR(50) DEFAULT 'unknown',
+			last_checked_at TIMESTAMP NULL,
+			last_latency_ms FLOAT DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+			INDEX idx_user_id (user_id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS uptime_logs (
+			id BIGINT PRIMARY KEY AUTO_INCREMENT,
+			monitor_id BIGINT NOT NULL,
+			status VARCHAR(50) NOT NULL,
+			latency_ms FLOAT DEFAULT 0,
+			status_code INT DEFAULT 0,
+			error TEXT DEFAULT '',
+			checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (monitor_id) REFERENCES uptime_monitors(id) ON DELETE CASCADE,
+			INDEX idx_monitor_id (monitor_id),
+			INDEX idx_checked_at (checked_at)
+		)`,
 	} {
 		if _, err := db.conn.Exec(stmt); err != nil {
 			// Table might already exist, continue
@@ -452,4 +481,124 @@ func (db *MySQLDB) CleanupOldLogs(days int) error {
 		days,
 	)
 	return err
+}
+
+// --- Uptime monitor operations ---
+
+func (db *MySQLDB) CreateUptimeMonitor(userID int64, name, url, checkType string, intervalMin, timeoutSec, expectedCode int) (*models.UptimeMonitor, error) {
+	result, err := db.conn.Exec(
+		`INSERT INTO uptime_monitors (user_id, name, url, check_type, interval_min, timeout_sec, expected_code) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		userID, name, url, checkType, intervalMin, timeoutSec, expectedCode,
+	)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := result.LastInsertId()
+	return db.GetUptimeMonitorByID(id)
+}
+
+func (db *MySQLDB) GetUptimeMonitorByID(id int64) (*models.UptimeMonitor, error) {
+	m := &models.UptimeMonitor{}
+	err := db.conn.QueryRow(
+		`SELECT id, user_id, name, url, check_type, interval_min, timeout_sec, expected_code, enabled, status, last_checked_at, last_latency_ms, created_at FROM uptime_monitors WHERE id = ?`, id,
+	).Scan(&m.ID, &m.UserID, &m.Name, &m.URL, &m.CheckType, &m.IntervalMin, &m.TimeoutSec, &m.ExpectedCode, &m.Enabled, &m.Status, &m.LastCheckedAt, &m.LastLatencyMs, &m.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (db *MySQLDB) GetUptimeMonitorsByUserID(userID int64) ([]*models.UptimeMonitor, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, user_id, name, url, check_type, interval_min, timeout_sec, expected_code, enabled, status, last_checked_at, last_latency_ms, created_at FROM uptime_monitors WHERE user_id = ? ORDER BY created_at DESC`, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var monitors []*models.UptimeMonitor
+	for rows.Next() {
+		m := &models.UptimeMonitor{}
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Name, &m.URL, &m.CheckType, &m.IntervalMin, &m.TimeoutSec, &m.ExpectedCode, &m.Enabled, &m.Status, &m.LastCheckedAt, &m.LastLatencyMs, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		monitors = append(monitors, m)
+	}
+	return monitors, nil
+}
+
+func (db *MySQLDB) GetAllUptimeMonitors() ([]*models.UptimeMonitor, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, user_id, name, url, check_type, interval_min, timeout_sec, expected_code, enabled, status, last_checked_at, last_latency_ms, created_at FROM uptime_monitors WHERE enabled = TRUE ORDER BY id`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var monitors []*models.UptimeMonitor
+	for rows.Next() {
+		m := &models.UptimeMonitor{}
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Name, &m.URL, &m.CheckType, &m.IntervalMin, &m.TimeoutSec, &m.ExpectedCode, &m.Enabled, &m.Status, &m.LastCheckedAt, &m.LastLatencyMs, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		monitors = append(monitors, m)
+	}
+	return monitors, nil
+}
+
+func (db *MySQLDB) UpdateUptimeMonitorStatus(id int64, status string, latencyMs float64, checkedAt time.Time) error {
+	_, err := db.conn.Exec(
+		`UPDATE uptime_monitors SET status = ?, last_latency_ms = ?, last_checked_at = ? WHERE id = ?`,
+		status, latencyMs, checkedAt, id,
+	)
+	return err
+}
+
+func (db *MySQLDB) DeleteUptimeMonitor(id int64, userID int64) error {
+	_, err := db.conn.Exec(`DELETE FROM uptime_monitors WHERE id = ? AND user_id = ?`, id, userID)
+	return err
+}
+
+func (db *MySQLDB) LogUptimeCheck(monitorID int64, status string, latencyMs float64, statusCode int, errMsg string) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO uptime_logs (monitor_id, status, latency_ms, status_code, error) VALUES (?, ?, ?, ?, ?)`,
+		monitorID, status, latencyMs, statusCode, errMsg,
+	)
+	return err
+}
+
+func (db *MySQLDB) GetUptimeLogs(monitorID int64, limit int) ([]*models.UptimeLog, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, monitor_id, status, latency_ms, status_code, error, checked_at FROM uptime_logs WHERE monitor_id = ? ORDER BY checked_at DESC LIMIT ?`,
+		monitorID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var logs []*models.UptimeLog
+	for rows.Next() {
+		l := &models.UptimeLog{}
+		if err := rows.Scan(&l.ID, &l.MonitorID, &l.Status, &l.LatencyMs, &l.StatusCode, &l.Error, &l.CheckedAt); err != nil {
+			return nil, err
+		}
+		logs = append(logs, l)
+	}
+	return logs, nil
+}
+
+func (db *MySQLDB) GetUptimePct(monitorID int64, hours int) (float64, error) {
+	var total, up int
+	db.conn.QueryRow(
+		`SELECT COUNT(*) FROM uptime_logs WHERE monitor_id = ? AND checked_at > DATE_SUB(NOW(), INTERVAL ? HOUR)`,
+		monitorID, hours,
+	).Scan(&total)
+	if total == 0 {
+		return 100.0, nil
+	}
+	db.conn.QueryRow(
+		`SELECT COUNT(*) FROM uptime_logs WHERE monitor_id = ? AND status = 'up' AND checked_at > DATE_SUB(NOW(), INTERVAL ? HOUR)`,
+		monitorID, hours,
+	).Scan(&up)
+	return float64(up) / float64(total) * 100, nil
 }

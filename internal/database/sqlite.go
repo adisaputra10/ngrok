@@ -101,6 +101,38 @@ func (db *SQLiteDB) migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 	CREATE INDEX IF NOT EXISTS idx_request_logs_tunnel_id ON request_logs(tunnel_id);
 	CREATE INDEX IF NOT EXISTS idx_request_logs_created ON request_logs(created_at);
+
+	CREATE TABLE IF NOT EXISTS uptime_monitors (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		name TEXT NOT NULL,
+		url TEXT NOT NULL,
+		check_type TEXT NOT NULL DEFAULT 'http',
+		interval_min INTEGER NOT NULL DEFAULT 5,
+		timeout_sec INTEGER NOT NULL DEFAULT 10,
+		expected_code INTEGER NOT NULL DEFAULT 200,
+		enabled BOOLEAN DEFAULT TRUE,
+		status TEXT DEFAULT 'unknown',
+		last_checked_at DATETIME,
+		last_latency_ms REAL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS uptime_logs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		monitor_id INTEGER NOT NULL,
+		status TEXT NOT NULL,
+		latency_ms REAL DEFAULT 0,
+		status_code INTEGER DEFAULT 0,
+		error TEXT DEFAULT '',
+		checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (monitor_id) REFERENCES uptime_monitors(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_uptime_monitors_user_id ON uptime_monitors(user_id);
+	CREATE INDEX IF NOT EXISTS idx_uptime_logs_monitor_id ON uptime_logs(monitor_id);
+	CREATE INDEX IF NOT EXISTS idx_uptime_logs_checked_at ON uptime_logs(checked_at);
 	`
 
 	_, err := db.conn.Exec(schema)
@@ -475,4 +507,123 @@ func (db *SQLiteDB) CleanupOldLogs(days int) error {
 		fmt.Sprintf("-%d", days),
 	)
 	return err
+}
+// --- Uptime monitor operations ---
+
+func (db *SQLiteDB) CreateUptimeMonitor(userID int64, name, url, checkType string, intervalMin, timeoutSec, expectedCode int) (*models.UptimeMonitor, error) {
+	result, err := db.conn.Exec(
+		`INSERT INTO uptime_monitors (user_id, name, url, check_type, interval_min, timeout_sec, expected_code) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		userID, name, url, checkType, intervalMin, timeoutSec, expectedCode,
+	)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := result.LastInsertId()
+	return db.GetUptimeMonitorByID(id)
+}
+
+func (db *SQLiteDB) GetUptimeMonitorByID(id int64) (*models.UptimeMonitor, error) {
+	m := &models.UptimeMonitor{}
+	err := db.conn.QueryRow(
+		`SELECT id, user_id, name, url, check_type, interval_min, timeout_sec, expected_code, enabled, status, last_checked_at, last_latency_ms, created_at FROM uptime_monitors WHERE id = ?`, id,
+	).Scan(&m.ID, &m.UserID, &m.Name, &m.URL, &m.CheckType, &m.IntervalMin, &m.TimeoutSec, &m.ExpectedCode, &m.Enabled, &m.Status, &m.LastCheckedAt, &m.LastLatencyMs, &m.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (db *SQLiteDB) GetUptimeMonitorsByUserID(userID int64) ([]*models.UptimeMonitor, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, user_id, name, url, check_type, interval_min, timeout_sec, expected_code, enabled, status, last_checked_at, last_latency_ms, created_at FROM uptime_monitors WHERE user_id = ? ORDER BY created_at DESC`, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var monitors []*models.UptimeMonitor
+	for rows.Next() {
+		m := &models.UptimeMonitor{}
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Name, &m.URL, &m.CheckType, &m.IntervalMin, &m.TimeoutSec, &m.ExpectedCode, &m.Enabled, &m.Status, &m.LastCheckedAt, &m.LastLatencyMs, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		monitors = append(monitors, m)
+	}
+	return monitors, nil
+}
+
+func (db *SQLiteDB) GetAllUptimeMonitors() ([]*models.UptimeMonitor, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, user_id, name, url, check_type, interval_min, timeout_sec, expected_code, enabled, status, last_checked_at, last_latency_ms, created_at FROM uptime_monitors WHERE enabled = TRUE ORDER BY id`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var monitors []*models.UptimeMonitor
+	for rows.Next() {
+		m := &models.UptimeMonitor{}
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Name, &m.URL, &m.CheckType, &m.IntervalMin, &m.TimeoutSec, &m.ExpectedCode, &m.Enabled, &m.Status, &m.LastCheckedAt, &m.LastLatencyMs, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		monitors = append(monitors, m)
+	}
+	return monitors, nil
+}
+
+func (db *SQLiteDB) UpdateUptimeMonitorStatus(id int64, status string, latencyMs float64, checkedAt time.Time) error {
+	_, err := db.conn.Exec(
+		`UPDATE uptime_monitors SET status = ?, last_latency_ms = ?, last_checked_at = ? WHERE id = ?`,
+		status, latencyMs, checkedAt, id,
+	)
+	return err
+}
+
+func (db *SQLiteDB) DeleteUptimeMonitor(id int64, userID int64) error {
+	_, err := db.conn.Exec(`DELETE FROM uptime_monitors WHERE id = ? AND user_id = ?`, id, userID)
+	return err
+}
+
+func (db *SQLiteDB) LogUptimeCheck(monitorID int64, status string, latencyMs float64, statusCode int, errMsg string) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO uptime_logs (monitor_id, status, latency_ms, status_code, error) VALUES (?, ?, ?, ?, ?)`,
+		monitorID, status, latencyMs, statusCode, errMsg,
+	)
+	return err
+}
+
+func (db *SQLiteDB) GetUptimeLogs(monitorID int64, limit int) ([]*models.UptimeLog, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, monitor_id, status, latency_ms, status_code, error, checked_at FROM uptime_logs WHERE monitor_id = ? ORDER BY checked_at DESC LIMIT ?`,
+		monitorID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var logs []*models.UptimeLog
+	for rows.Next() {
+		l := &models.UptimeLog{}
+		if err := rows.Scan(&l.ID, &l.MonitorID, &l.Status, &l.LatencyMs, &l.StatusCode, &l.Error, &l.CheckedAt); err != nil {
+			return nil, err
+		}
+		logs = append(logs, l)
+	}
+	return logs, nil
+}
+
+func (db *SQLiteDB) GetUptimePct(monitorID int64, hours int) (float64, error) {
+	var total, up int
+	db.conn.QueryRow(
+		`SELECT COUNT(*) FROM uptime_logs WHERE monitor_id = ? AND checked_at > datetime('now', ? || ' hours')`,
+		monitorID, fmt.Sprintf("-%d", hours),
+	).Scan(&total)
+	if total == 0 {
+		return 100.0, nil
+	}
+	db.conn.QueryRow(
+		`SELECT COUNT(*) FROM uptime_logs WHERE monitor_id = ? AND status = 'up' AND checked_at > datetime('now', ? || ' hours')`,
+		monitorID, fmt.Sprintf("-%d", hours),
+	).Scan(&up)
+	return float64(up) / float64(total) * 100, nil
 }

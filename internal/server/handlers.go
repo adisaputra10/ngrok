@@ -732,3 +732,176 @@ func jsonError(w http.ResponseWriter, message string, code int) {
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
+// --- Uptime Monitoring Handlers ---
+
+type uptimePageData struct {
+	Monitors []*uptimeMonitorView
+}
+
+type uptimeMonitorView struct {
+	ID            int64
+	Name          string
+	URL           string
+	CheckType     string
+	IntervalMin   int
+	Status        string
+	LastLatencyMs float64
+	LastCheckedAt string
+	UptimePct     float64
+	Logs          []*uptimeLogView
+}
+
+type uptimeLogView struct {
+	Status     string
+	LatencyMs  float64
+	StatusCode int
+	Error      string
+	CheckedAt  string
+}
+
+func (s *Server) handleUptime(w http.ResponseWriter, r *http.Request, user *models.User) {
+	monitors, err := s.db.GetUptimeMonitorsByUserID(user.ID)
+	if err != nil {
+		monitors = nil
+	}
+
+	views := make([]*uptimeMonitorView, 0, len(monitors))
+	for _, m := range monitors {
+		pct, _ := s.db.GetUptimePct(m.ID, 24)
+		logs, _ := s.db.GetUptimeLogs(m.ID, 20)
+
+		lv := make([]*uptimeLogView, 0, len(logs))
+		for _, l := range logs {
+			lv = append(lv, &uptimeLogView{
+				Status:     l.Status,
+				LatencyMs:  l.LatencyMs,
+				StatusCode: l.StatusCode,
+				Error:      l.Error,
+				CheckedAt:  l.CheckedAt.Format("2006-01-02 15:04:05"),
+			})
+		}
+
+		lastChecked := "Never"
+		if m.LastCheckedAt != nil {
+			lastChecked = m.LastCheckedAt.Format("2006-01-02 15:04:05")
+		}
+
+		views = append(views, &uptimeMonitorView{
+			ID:            m.ID,
+			Name:          m.Name,
+			URL:           m.URL,
+			CheckType:     m.CheckType,
+			IntervalMin:   m.IntervalMin,
+			Status:        m.Status,
+			LastLatencyMs: m.LastLatencyMs,
+			LastCheckedAt: lastChecked,
+			UptimePct:     pct,
+			Logs:          lv,
+		})
+	}
+
+	s.render(w, r, "uptime.html", &pageData{
+		User:   user,
+		Domain: s.config.Domain,
+		Data:   &uptimePageData{Monitors: views},
+	})
+}
+
+func (s *Server) handleAPIAddMonitor(w http.ResponseWriter, r *http.Request, user *models.User) {
+	if r.Method != "POST" {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	targetURL := strings.TrimSpace(r.FormValue("url"))
+	checkType := r.FormValue("check_type")
+	intervalStr := r.FormValue("interval_min")
+	timeoutStr := r.FormValue("timeout_sec")
+
+	if name == "" || targetURL == "" {
+		jsonError(w, "name and url are required", http.StatusBadRequest)
+		return
+	}
+	if checkType != "tcp" {
+		checkType = "http"
+	}
+
+	intervalMin := 5
+	if v, err := strconv.Atoi(intervalStr); err == nil && (v == 1 || v == 5) {
+		intervalMin = v
+	}
+	timeoutSec := 10
+	if v, err := strconv.Atoi(timeoutStr); err == nil && v > 0 && v <= 60 {
+		timeoutSec = v
+	}
+
+	monitor, err := s.db.CreateUptimeMonitor(user.ID, name, targetURL, checkType, intervalMin, timeoutSec, 200)
+	if err != nil {
+		jsonError(w, "failed to create monitor: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Start monitoring immediately
+	s.monitorSvc.StartMonitor(monitor)
+
+	http.Redirect(w, r, "/dashboard/uptime", http.StatusSeeOther)
+}
+
+func (s *Server) handleAPIDeleteMonitor(w http.ResponseWriter, r *http.Request, user *models.User) {
+	if r.Method != "POST" {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	s.monitorSvc.StopMonitor(id)
+	if err := s.db.DeleteUptimeMonitor(id, user.ID); err != nil {
+		jsonError(w, "failed to delete monitor: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/dashboard/uptime", http.StatusSeeOther)
+}
+
+func (s *Server) handleAPIUptimeLogs(w http.ResponseWriter, r *http.Request, user *models.User) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	logs, err := s.db.GetUptimeLogs(id, 50)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, logs)
+}
+
+func (s *Server) handleAPIUptimeStatus(w http.ResponseWriter, r *http.Request, user *models.User) {
+	monitors, err := s.db.GetUptimeMonitorsByUserID(user.ID)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type statusItem struct {
+		ID        int64   `json:"id"`
+		Status    string  `json:"status"`
+		LatencyMs float64 `json:"latency_ms"`
+	}
+
+	result := make([]statusItem, 0, len(monitors))
+	for _, m := range monitors {
+		result = append(result, statusItem{ID: m.ID, Status: m.Status, LatencyMs: m.LastLatencyMs})
+	}
+	jsonResponse(w, result)
+}

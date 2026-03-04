@@ -10,6 +10,7 @@ import (
 
 	"gotunnel/internal/auth"
 	"gotunnel/internal/database"
+	"gotunnel/internal/monitor"
 	"gotunnel/internal/tunnel"
 )
 
@@ -25,6 +26,7 @@ type Server struct {
 	db          database.DB
 	authService *auth.Service
 	tunnelMgr   *tunnel.Manager
+	monitorSvc  *monitor.Service
 	templates   map[string]*template.Template
 }
 
@@ -39,6 +41,7 @@ func New(config *Config) (*Server, error) {
 	// Initialize services
 	authSvc := auth.NewService(db, config.Secret)
 	tunnelMgr := tunnel.NewManager(db, config.Domain)
+	monitorSvc := monitor.New(db)
 
 	// Parse templates
 	tmpl, err := parseTemplates()
@@ -46,13 +49,19 @@ func New(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	return &Server{
+	srv := &Server{
 		config:      config,
 		db:          db,
 		authService: authSvc,
 		tunnelMgr:   tunnelMgr,
+		monitorSvc:  monitorSvc,
 		templates:   tmpl,
-	}, nil
+	}
+
+	// Start uptime monitor background service
+	go monitorSvc.Start()
+
+	return srv, nil
 }
 
 func parseTemplates() (map[string]*template.Template, error) {
@@ -108,6 +117,7 @@ func parseTemplates() (map[string]*template.Template, error) {
 		"settings.html",
 		"logs.html",
 		"admin-users.html",
+		"uptime.html",
 	}
 
 	templates := make(map[string]*template.Template)
@@ -167,6 +177,13 @@ func (s *Server) adminHandler() http.Handler {
 	mux.HandleFunc("/api/admin/users/update", s.requireAdmin(s.handleAPIAdminUpdateUser))
 	mux.HandleFunc("/api/admin/users/delete", s.requireAdmin(s.handleAPIAdminDeleteUser))
 	mux.HandleFunc("/api/admin/users/reset-password", s.requireAdmin(s.handleAPIAdminResetPassword))
+
+	// Uptime monitoring routes
+	mux.HandleFunc("/dashboard/uptime", s.requireAuth(s.handleUptime))
+	mux.HandleFunc("/api/uptime/add", s.requireAuth(s.handleAPIAddMonitor))
+	mux.HandleFunc("/api/uptime/delete", s.requireAuth(s.handleAPIDeleteMonitor))
+	mux.HandleFunc("/api/uptime/logs", s.requireAuth(s.handleAPIUptimeLogs))
+	mux.HandleFunc("/api/uptime/status", s.requireAuth(s.handleAPIUptimeStatus))
 
 	// WebSocket tunnel endpoint
 	mux.HandleFunc("/ws/tunnel", s.handleTunnelWebSocket)

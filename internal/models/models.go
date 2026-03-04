@@ -59,6 +59,35 @@ type TunnelStats struct {
 	RequestsToday   int64   `json:"requests_today"`
 }
 
+// UptimeMonitor represents a domain/URL to be monitored
+type UptimeMonitor struct {
+	ID            int64      `json:"id"`
+	UserID        int64      `json:"user_id"`
+	Name          string     `json:"name"`
+	URL           string     `json:"url"`
+	CheckType     string     `json:"check_type"` // http, tcp
+	IntervalMin   int        `json:"interval_min"` // 1 or 5
+	TimeoutSec    int        `json:"timeout_sec"`
+	ExpectedCode  int        `json:"expected_code"` // for http
+	Enabled       bool       `json:"enabled"`
+	Status        string     `json:"status"` // up, down, unknown
+	LastCheckedAt *time.Time `json:"last_checked_at,omitempty"`
+	LastLatencyMs float64    `json:"last_latency_ms"`
+	UptimePct     float64    `json:"uptime_pct"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
+
+// UptimeLog represents a single uptime check result
+type UptimeLog struct {
+	ID         int64     `json:"id"`
+	MonitorID  int64     `json:"monitor_id"`
+	Status     string    `json:"status"` // up, down
+	LatencyMs  float64   `json:"latency_ms"`
+	StatusCode int       `json:"status_code"`
+	Error      string    `json:"error,omitempty"`
+	CheckedAt  time.Time `json:"checked_at"`
+}
+
 // ConnectionInfo represents a live tunnel connection
 type ConnectionInfo struct {
 	TunnelID    string    `json:"tunnel_id"`

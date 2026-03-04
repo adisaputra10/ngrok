@@ -44,6 +44,17 @@ type DB interface {
 	GetStats(userID int64) (*models.TunnelStats, error)
 	CleanupOldLogs(days int) error
 
+	// Uptime monitor operations
+	CreateUptimeMonitor(userID int64, name, url, checkType string, intervalMin, timeoutSec, expectedCode int) (*models.UptimeMonitor, error)
+	GetUptimeMonitorsByUserID(userID int64) ([]*models.UptimeMonitor, error)
+	GetAllUptimeMonitors() ([]*models.UptimeMonitor, error)
+	GetUptimeMonitorByID(id int64) (*models.UptimeMonitor, error)
+	UpdateUptimeMonitorStatus(id int64, status string, latencyMs float64, checkedAt time.Time) error
+	DeleteUptimeMonitor(id int64, userID int64) error
+	LogUptimeCheck(monitorID int64, status string, latencyMs float64, statusCode int, errMsg string) error
+	GetUptimeLogs(monitorID int64, limit int) ([]*models.UptimeLog, error)
+	GetUptimePct(monitorID int64, hours int) (float64, error)
+
 	// Connection management
 	Close() error
 }
