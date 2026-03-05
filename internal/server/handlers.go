@@ -581,9 +581,10 @@ func (s *Server) handleAPIAdminUpdateUser(w http.ResponseWriter, r *http.Request
 	}
 
 	var req struct {
-		UserID     int64 `json:"user_id"`
-		IsAdmin    *bool `json:"is_admin"`
-		MaxTunnels *int  `json:"max_tunnels"`
+		UserID            int64 `json:"user_id"`
+		IsAdmin           *bool `json:"is_admin"`
+		MaxTunnels        *int  `json:"max_tunnels"`
+		MaxUptimeMonitors *int  `json:"max_uptime_monitors"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "Invalid request body", 400)
@@ -619,6 +620,18 @@ func (s *Server) handleAPIAdminUpdateUser(w http.ResponseWriter, r *http.Request
 			return
 		}
 		target.MaxTunnels = *req.MaxTunnels
+	}
+
+	if req.MaxUptimeMonitors != nil {
+		if *req.MaxUptimeMonitors < 0 || *req.MaxUptimeMonitors > 100 {
+			jsonError(w, "Max uptime monitors must be between 0 and 100", 400)
+			return
+		}
+		if err := s.db.UpdateUserMaxUptimeMonitors(req.UserID, *req.MaxUptimeMonitors); err != nil {
+			jsonError(w, "Failed to update max uptime monitors", 500)
+			return
+		}
+		target.MaxUptimeMonitors = *req.MaxUptimeMonitors
 	}
 
 	jsonResponse(w, target)
@@ -944,6 +957,14 @@ func (s *Server) handleAPIAddMonitor(w http.ResponseWriter, r *http.Request, use
 		jsonError(w, "name and url are required", http.StatusBadRequest)
 		return
 	}
+
+	// Enforce per-user uptime monitor limit
+	existingMonitors, err := s.db.GetUptimeMonitorsByUserID(user.ID)
+	if err == nil && len(existingMonitors) >= user.MaxUptimeMonitors {
+		jsonError(w, fmt.Sprintf("Maximum %d uptime monitors allowed", user.MaxUptimeMonitors), http.StatusBadRequest)
+		return
+	}
+
 	if checkType != "tcp" {
 		checkType = "http"
 	}

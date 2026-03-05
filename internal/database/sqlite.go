@@ -58,6 +58,7 @@ func (db *SQLiteDB) migrate() error {
 		auth_token TEXT UNIQUE NOT NULL,
 		is_admin BOOLEAN DEFAULT FALSE,
 		max_tunnels INTEGER DEFAULT 5,
+		max_uptime_monitors INTEGER DEFAULT 3,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -150,7 +151,12 @@ func (db *SQLiteDB) migrate() error {
 	`
 
 	_, err := db.conn.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+	// Add columns for existing databases (error ignored if already present)
+	db.conn.Exec(`ALTER TABLE users ADD COLUMN max_uptime_monitors INTEGER DEFAULT 3`)
+	return nil
 }
 
 // --- Custom Domain operations ---
@@ -259,9 +265,9 @@ func (db *SQLiteDB) CreateUser(email, username, passwordHash, authToken string) 
 func (db *SQLiteDB) GetUserByID(id int64) (*models.User, error) {
 	user := &models.User{}
 	err := db.conn.QueryRow(
-		`SELECT id, email, username, password_hash, auth_token, is_admin, max_tunnels, created_at, updated_at FROM users WHERE id = ?`,
+		`SELECT id, email, username, password_hash, auth_token, is_admin, max_tunnels, max_uptime_monitors, created_at, updated_at FROM users WHERE id = ?`,
 		id,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.AuthToken, &user.IsAdmin, &user.MaxTunnels, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.AuthToken, &user.IsAdmin, &user.MaxTunnels, &user.MaxUptimeMonitors, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -272,9 +278,9 @@ func (db *SQLiteDB) GetUserByID(id int64) (*models.User, error) {
 func (db *SQLiteDB) GetUserByEmail(email string) (*models.User, error) {
 	user := &models.User{}
 	err := db.conn.QueryRow(
-		`SELECT id, email, username, password_hash, auth_token, is_admin, max_tunnels, created_at, updated_at FROM users WHERE email = ?`,
+		`SELECT id, email, username, password_hash, auth_token, is_admin, max_tunnels, max_uptime_monitors, created_at, updated_at FROM users WHERE email = ?`,
 		email,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.AuthToken, &user.IsAdmin, &user.MaxTunnels, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.AuthToken, &user.IsAdmin, &user.MaxTunnels, &user.MaxUptimeMonitors, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -285,9 +291,9 @@ func (db *SQLiteDB) GetUserByEmail(email string) (*models.User, error) {
 func (db *SQLiteDB) GetUserByUsername(username string) (*models.User, error) {
 	user := &models.User{}
 	err := db.conn.QueryRow(
-		`SELECT id, email, username, password_hash, auth_token, is_admin, max_tunnels, created_at, updated_at FROM users WHERE username = ?`,
+		`SELECT id, email, username, password_hash, auth_token, is_admin, max_tunnels, max_uptime_monitors, created_at, updated_at FROM users WHERE username = ?`,
 		username,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.AuthToken, &user.IsAdmin, &user.MaxTunnels, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.AuthToken, &user.IsAdmin, &user.MaxTunnels, &user.MaxUptimeMonitors, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -298,9 +304,9 @@ func (db *SQLiteDB) GetUserByUsername(username string) (*models.User, error) {
 func (db *SQLiteDB) GetUserByAuthToken(token string) (*models.User, error) {
 	user := &models.User{}
 	err := db.conn.QueryRow(
-		`SELECT id, email, username, password_hash, auth_token, is_admin, max_tunnels, created_at, updated_at FROM users WHERE auth_token = ?`,
+		`SELECT id, email, username, password_hash, auth_token, is_admin, max_tunnels, max_uptime_monitors, created_at, updated_at FROM users WHERE auth_token = ?`,
 		token,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.AuthToken, &user.IsAdmin, &user.MaxTunnels, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.AuthToken, &user.IsAdmin, &user.MaxTunnels, &user.MaxUptimeMonitors, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +343,7 @@ func (db *SQLiteDB) UpdateUserAdmin(userID int64, isAdmin bool) error {
 // GetAllUsers returns all users (for admin)
 func (db *SQLiteDB) GetAllUsers() ([]*models.User, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, email, username, password_hash, auth_token, is_admin, max_tunnels, created_at, updated_at FROM users ORDER BY created_at DESC`,
+		`SELECT id, email, username, password_hash, auth_token, is_admin, max_tunnels, max_uptime_monitors, created_at, updated_at FROM users ORDER BY created_at DESC`,
 	)
 	if err != nil {
 		return nil, err
@@ -347,7 +353,7 @@ func (db *SQLiteDB) GetAllUsers() ([]*models.User, error) {
 	var users []*models.User
 	for rows.Next() {
 		user := &models.User{}
-		err := rows.Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.AuthToken, &user.IsAdmin, &user.MaxTunnels, &user.CreatedAt, &user.UpdatedAt)
+		err := rows.Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.AuthToken, &user.IsAdmin, &user.MaxTunnels, &user.MaxUptimeMonitors, &user.CreatedAt, &user.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -368,6 +374,15 @@ func (db *SQLiteDB) UpdateUserMaxTunnels(userID int64, maxTunnels int) error {
 	_, err := db.conn.Exec(
 		`UPDATE users SET max_tunnels = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
 		maxTunnels, userID,
+	)
+	return err
+}
+
+// UpdateUserMaxUptimeMonitors updates the max uptime monitors allowed for a user
+func (db *SQLiteDB) UpdateUserMaxUptimeMonitors(userID int64, max int) error {
+	_, err := db.conn.Exec(
+		`UPDATE users SET max_uptime_monitors = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		max, userID,
 	)
 	return err
 }

@@ -18,6 +18,7 @@ type DB interface {
 	UpdateUserPassword(userID int64, passwordHash string) error
 	UpdateUserAdmin(userID int64, isAdmin bool) error
 	UpdateUserMaxTunnels(userID int64, maxTunnels int) error
+	UpdateUserMaxUptimeMonitors(userID int64, max int) error
 	DeleteUser(id int64) error
 	GetAllUsers() ([]*models.User, error)
 	UserCount() (int, error)

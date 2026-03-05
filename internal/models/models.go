@@ -9,9 +9,10 @@ type User struct {
 	Username     string    `json:"username"`
 	PasswordHash string    `json:"-"`
 	AuthToken    string    `json:"auth_token"`
-	IsAdmin      bool      `json:"is_admin"`
-	MaxTunnels   int       `json:"max_tunnels"`
-	CreatedAt    time.Time `json:"created_at"`
+	IsAdmin           bool      `json:"is_admin"`
+	MaxTunnels        int       `json:"max_tunnels"`
+	MaxUptimeMonitors int       `json:"max_uptime_monitors"`
+	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
