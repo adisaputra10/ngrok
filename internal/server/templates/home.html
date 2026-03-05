@@ -94,6 +94,56 @@
         </div>
     </div>
 
+    <!-- Uptime Status -->
+    {{$monitors := .Data}}
+    {{if $monitors}}
+    <div class="max-w-6xl mx-auto px-6 pb-16">
+        <div class="card rounded-xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-700/50 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-green-400 pulse-dot"></div>
+                    <span class="text-sm font-medium text-gray-300">Service Status</span>
+                </div>
+                <span class="text-xs text-gray-500">Live monitoring</span>
+            </div>
+            <div class="divide-y divide-gray-700/30">
+                {{range $monitors}}
+                <div class="px-6 py-3 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        {{if eq .Status "up"}}
+                        <div class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></div>
+                        {{else if eq .Status "down"}}
+                        <div class="w-2 h-2 rounded-full bg-red-400 flex-shrink-0"></div>
+                        {{else}}
+                        <div class="w-2 h-2 rounded-full bg-gray-500 flex-shrink-0"></div>
+                        {{end}}
+                        <div>
+                            <span class="text-sm font-medium text-gray-200">{{.Name}}</span>
+                            <span class="ml-2 text-xs text-gray-500 font-mono">{{.URL}}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        {{if gt .LastLatencyMs 0.0}}
+                        <span class="text-xs font-mono
+                            {{if lt .LastLatencyMs 200.0}}text-green-400
+                            {{else if lt .LastLatencyMs 500.0}}text-yellow-400
+                            {{else}}text-red-400{{end}}">{{printf "%.0f" .LastLatencyMs}}ms</span>
+                        {{end}}
+                        {{if eq .Status "up"}}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">Operational</span>
+                        {{else if eq .Status "down"}}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400">Outage</span>
+                        {{else}}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">Unknown</span>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </div>
+    {{end}}
+
     <!-- Footer -->
     <footer class="border-t border-gray-800/50 py-8 text-center text-gray-500 text-sm">
         <p>Demolocal — Self-hosted tunnel service. Built with Go.</p>
