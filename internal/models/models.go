@@ -77,6 +77,16 @@ type UptimeMonitor struct {
 	CreatedAt     time.Time  `json:"created_at"`
 }
 
+// CustomDomain maps a user-owned domain to a specific tunnel
+type CustomDomain struct {
+	ID        int64     `json:"id"`
+	TunnelID  int64     `json:"tunnel_id"`
+	UserID    int64     `json:"user_id"`
+	Domain    string    `json:"domain"`
+	Status    string    `json:"status"` // pending, active
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // UptimeLog represents a single uptime check result
 type UptimeLog struct {
 	ID         int64     `json:"id"`

@@ -133,9 +133,104 @@ func (db *SQLiteDB) migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_uptime_monitors_user_id ON uptime_monitors(user_id);
 	CREATE INDEX IF NOT EXISTS idx_uptime_logs_monitor_id ON uptime_logs(monitor_id);
 	CREATE INDEX IF NOT EXISTS idx_uptime_logs_checked_at ON uptime_logs(checked_at);
+
+	CREATE TABLE IF NOT EXISTS custom_domains (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		tunnel_id INTEGER NOT NULL,
+		user_id INTEGER NOT NULL,
+		domain TEXT UNIQUE NOT NULL,
+		status TEXT DEFAULT 'pending',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (tunnel_id) REFERENCES tunnels(id) ON DELETE CASCADE,
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_custom_domains_domain ON custom_domains(domain);
+	CREATE INDEX IF NOT EXISTS idx_custom_domains_tunnel ON custom_domains(tunnel_id);
 	`
 
 	_, err := db.conn.Exec(schema)
+	return err
+}
+
+// --- Custom Domain operations ---
+
+func (db *SQLiteDB) CreateCustomDomain(userID, tunnelID int64, domain string) (*models.CustomDomain, error) {
+	result, err := db.conn.Exec(
+		`INSERT INTO custom_domains (tunnel_id, user_id, domain) VALUES (?, ?, ?)`,
+		tunnelID, userID, domain,
+	)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := result.LastInsertId()
+	return db.getCustomDomainByID(id)
+}
+
+func (db *SQLiteDB) getCustomDomainByID(id int64) (*models.CustomDomain, error) {
+	cd := &models.CustomDomain{}
+	err := db.conn.QueryRow(
+		`SELECT id, tunnel_id, user_id, domain, status, created_at FROM custom_domains WHERE id = ?`, id,
+	).Scan(&cd.ID, &cd.TunnelID, &cd.UserID, &cd.Domain, &cd.Status, &cd.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return cd, nil
+}
+
+func (db *SQLiteDB) GetCustomDomainsByTunnelID(tunnelID int64) ([]*models.CustomDomain, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, tunnel_id, user_id, domain, status, created_at FROM custom_domains WHERE tunnel_id = ? ORDER BY created_at DESC`,
+		tunnelID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.CustomDomain
+	for rows.Next() {
+		cd := &models.CustomDomain{}
+		if err := rows.Scan(&cd.ID, &cd.TunnelID, &cd.UserID, &cd.Domain, &cd.Status, &cd.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, cd)
+	}
+	return list, nil
+}
+
+func (db *SQLiteDB) GetCustomDomainsByUserID(userID int64) ([]*models.CustomDomain, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, tunnel_id, user_id, domain, status, created_at FROM custom_domains WHERE user_id = ? ORDER BY created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*models.CustomDomain
+	for rows.Next() {
+		cd := &models.CustomDomain{}
+		if err := rows.Scan(&cd.ID, &cd.TunnelID, &cd.UserID, &cd.Domain, &cd.Status, &cd.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, cd)
+	}
+	return list, nil
+}
+
+func (db *SQLiteDB) GetCustomDomainByDomain(domain string) (*models.CustomDomain, error) {
+	cd := &models.CustomDomain{}
+	err := db.conn.QueryRow(
+		`SELECT id, tunnel_id, user_id, domain, status, created_at FROM custom_domains WHERE domain = ?`, domain,
+	).Scan(&cd.ID, &cd.TunnelID, &cd.UserID, &cd.Domain, &cd.Status, &cd.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return cd, nil
+}
+
+func (db *SQLiteDB) DeleteCustomDomain(id int64, userID int64) error {
+	_, err := db.conn.Exec(`DELETE FROM custom_domains WHERE id = ? AND user_id = ?`, id, userID)
 	return err
 }
 

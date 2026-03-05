@@ -20,17 +20,28 @@ func (s *Server) proxyHandler() http.Handler {
 			host = host[:idx]
 		}
 
-		// Extract subdomain
-		if !strings.HasSuffix(host, "."+s.config.Domain) {
-			// Not a tunnel request — could be the main domain
-			http.Error(w, "Not Found", http.StatusNotFound)
-			return
-		}
+		var subdomain string
 
-		subdomain := strings.TrimSuffix(host, "."+s.config.Domain)
-		if subdomain == "" || strings.Contains(subdomain, ".") {
-			http.Error(w, "Invalid subdomain", http.StatusBadRequest)
-			return
+		if strings.HasSuffix(host, "."+s.config.Domain) {
+			// Standard subdomain tunnel (e.g. myapp-ab.demolocal.online)
+			subdomain = strings.TrimSuffix(host, "."+s.config.Domain)
+			if subdomain == "" || strings.Contains(subdomain, ".") {
+				http.Error(w, "Invalid subdomain", http.StatusBadRequest)
+				return
+			}
+		} else {
+			// Custom domain — look up which tunnel it belongs to
+			cd, err := s.db.GetCustomDomainByDomain(host)
+			if err != nil {
+				http.Error(w, "Not Found", http.StatusNotFound)
+				return
+			}
+			t, err := s.db.GetTunnelByID(cd.TunnelID)
+			if err != nil {
+				http.Error(w, "Not Found", http.StatusNotFound)
+				return
+			}
+			subdomain = t.Subdomain
 		}
 
 		// Check if tunnel exists

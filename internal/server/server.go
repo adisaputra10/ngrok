@@ -185,6 +185,10 @@ func (s *Server) adminHandler() http.Handler {
 	mux.HandleFunc("/api/uptime/logs", s.requireAuth(s.handleAPIUptimeLogs))
 	mux.HandleFunc("/api/uptime/status", s.requireAuth(s.handleAPIUptimeStatus))
 
+	// Custom domain routes
+	mux.HandleFunc("/api/custom-domains/add", s.requireAuth(s.handleAPIAddCustomDomain))
+	mux.HandleFunc("/api/custom-domains/delete", s.requireAuth(s.handleAPIDeleteCustomDomain))
+
 	// WebSocket tunnel endpoint
 	mux.HandleFunc("/ws/tunnel", s.handleTunnelWebSocket)
 

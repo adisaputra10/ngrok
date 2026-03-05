@@ -62,10 +62,44 @@
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
                                     <a href="/dashboard/logs/{{.ID}}" class="text-xs text-indigo-400 hover:text-indigo-300">Logs</a>
+                                    <button onclick="toggleCustomDomains({{.ID}})" class="text-xs text-purple-400 hover:text-purple-300">Domains</button>
                                     {{if .Reserved}}
                                     <button onclick="deleteTunnel({{.ID}})" class="text-xs text-red-400 hover:text-red-300">Delete</button>
                                     {{end}}
                                 </div>
+                            </td>
+                        </tr>
+                        <!-- Custom Domains expand row -->
+                        <tr id="custom-domains-row-{{.ID}}" class="hidden bg-gray-900/40">
+                            <td colspan="6" class="px-8 py-4">
+                                <div class="text-xs text-gray-400 font-semibold mb-3 flex items-center gap-2">
+                                    <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+                                    Custom Domains
+                                    <span class="font-normal text-gray-500 ml-1">Point your domain's CNAME/A record to this server, then add it below.</span>
+                                </div>
+
+                                <!-- Existing custom domains -->
+                                <div id="cd-list-{{.ID}}" class="space-y-1.5 mb-3">
+                                    {{range .CustomDomains}}
+                                    <div class="flex items-center justify-between bg-gray-800/60 rounded-lg px-3 py-2" id="cd-item-{{.ID}}">
+                                        <div class="flex items-center gap-2">
+                                            <span class="w-1.5 h-1.5 rounded-full {{if eq .Status "active"}}bg-green-400{{else}}bg-yellow-400{{end}}"></span>
+                                            <span class="font-mono text-sm text-gray-200">{{.Domain}}</span>
+                                            <span class="text-xs px-1.5 py-0.5 rounded {{if eq .Status "active"}}bg-green-500/15 text-green-400{{else}}bg-yellow-500/15 text-yellow-400{{end}}">{{.Status}}</span>
+                                        </div>
+                                        <button onclick="deleteCustomDomain({{.ID}})" class="text-xs text-red-400 hover:text-red-300">Remove</button>
+                                    </div>
+                                    {{end}}
+                                </div>
+
+                                <!-- Add custom domain input -->
+                                <div class="flex items-center gap-2">
+                                    <input type="text" id="cd-input-{{.ID}}"
+                                        class="flex-1 max-w-xs px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono focus:outline-none focus:border-purple-500 placeholder-gray-600"
+                                        placeholder="app.yourdomain.com">
+                                    <button onclick="addCustomDomain({{.ID}})" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-xs font-medium transition">+ Add Domain</button>
+                                </div>
+                                <p class="mt-2 text-xs text-gray-600">SSL certificate is provisioned automatically via Let's Encrypt when AutoTLS is enabled.</p>
                             </td>
                         </tr>
                         {{end}}
@@ -182,10 +216,56 @@ async function deleteTunnel(tunnelId) {
         });
         if (resp.ok) {
             document.getElementById('tunnel-row-' + tunnelId)?.remove();
+            document.getElementById('custom-domains-row-' + tunnelId)?.remove();
         }
     } catch (e) {
         alert('Failed to delete tunnel');
     }
+}
+
+function toggleCustomDomains(tunnelId) {
+    const row = document.getElementById('custom-domains-row-' + tunnelId);
+    if (row) row.classList.toggle('hidden');
+}
+
+async function addCustomDomain(tunnelId) {
+    const input = document.getElementById('cd-input-' + tunnelId);
+    const domain = (input?.value || '').trim().toLowerCase();
+    if (!domain) return;
+    try {
+        const resp = await fetch('/api/custom-domains/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tunnel_id: tunnelId, domain })
+        });
+        const data = await resp.json();
+        if (!resp.ok) { alert(data.error || 'Failed to add domain'); return; }
+        // Append to list without page reload
+        const list = document.getElementById('cd-list-' + tunnelId);
+        const el = document.createElement('div');
+        el.id = 'cd-item-' + data.id;
+        el.className = 'flex items-center justify-between bg-gray-800/60 rounded-lg px-3 py-2';
+        el.innerHTML = `<div class="flex items-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
+            <span class="font-mono text-sm text-gray-200">${data.domain}</span>
+            <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400">pending</span>
+        </div>
+        <button onclick="deleteCustomDomain(${data.id})" class="text-xs text-red-400 hover:text-red-300">Remove</button>`;
+        list?.appendChild(el);
+        input.value = '';
+    } catch(e) { alert('Network error'); }
+}
+
+async function deleteCustomDomain(id) {
+    if (!confirm('Remove this custom domain?')) return;
+    try {
+        const resp = await fetch('/api/custom-domains/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        if (resp.ok) document.getElementById('cd-item-' + id)?.remove();
+    } catch(e) { alert('Failed to remove domain'); }
 }
 </script>
 {{end}}

@@ -55,6 +55,13 @@ type DB interface {
 	GetUptimeLogs(monitorID int64, limit int) ([]*models.UptimeLog, error)
 	GetUptimePct(monitorID int64, hours int) (float64, error)
 
+	// Custom domain operations
+	CreateCustomDomain(userID, tunnelID int64, domain string) (*models.CustomDomain, error)
+	GetCustomDomainsByTunnelID(tunnelID int64) ([]*models.CustomDomain, error)
+	GetCustomDomainsByUserID(userID int64) ([]*models.CustomDomain, error)
+	GetCustomDomainByDomain(domain string) (*models.CustomDomain, error)
+	DeleteCustomDomain(id int64, userID int64) error
+
 	// Connection management
 	Close() error
 }

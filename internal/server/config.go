@@ -198,6 +198,10 @@ func (s *Server) startWithAutoTLS(adminHandler, proxyHandler http.Handler) error
 			if _, ok := s.config.ExtraProxies[host]; ok {
 				return nil
 			}
+			// Allow registered custom domains
+			if _, err := s.db.GetCustomDomainByDomain(host); err == nil {
+				return nil
+			}
 			return fmt.Errorf("[tls] hostname %q not allowed", host)
 		},
 		Email:                  s.config.AutoTLSEmail,
@@ -230,6 +234,11 @@ func (s *Server) startWithAutoTLS(adminHandler, proxyHandler http.Handler) error
 		}
 		// Subdomains of main domain → tunnel proxy
 		if host != domain && strings.HasSuffix(host, "."+domain) {
+			proxyHandler.ServeHTTP(w, r)
+			return
+		}
+		// Custom domains → tunnel proxy
+		if _, err := s.db.GetCustomDomainByDomain(host); err == nil {
 			proxyHandler.ServeHTTP(w, r)
 			return
 		}

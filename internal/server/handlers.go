@@ -33,9 +33,14 @@ type dashboardData struct {
 }
 
 type tunnelsData struct {
-	Tunnels     []*models.Tunnel
+	Tunnels     []*tunnelWithDomains
 	Connections []*models.ConnectionInfo
 	Domain      string
+}
+
+type tunnelWithDomains struct {
+	*models.Tunnel
+	CustomDomains []*models.CustomDomain
 }
 
 type installData struct {
@@ -227,19 +232,26 @@ func (s *Server) handleTunnels(w http.ResponseWriter, r *http.Request, user *mod
 	for _, c := range connections {
 		activeSubdomains[c.Subdomain] = true
 	}
+
+	var tunnelsWithDomains []*tunnelWithDomains
 	for _, t := range tunnels {
 		if activeSubdomains[t.Subdomain] {
 			t.Status = "online"
 		} else {
 			t.Status = "offline"
 		}
+		cds, _ := s.db.GetCustomDomainsByTunnelID(t.ID)
+		tunnelsWithDomains = append(tunnelsWithDomains, &tunnelWithDomains{
+			Tunnel:        t,
+			CustomDomains: cds,
+		})
 	}
 
 	s.render(w, r, "tunnels.html", &pageData{
 		User:   user,
 		Domain: s.config.Domain,
 		Data: tunnelsData{
-			Tunnels:     tunnels,
+			Tunnels:     tunnelsWithDomains,
 			Connections: connections,
 			Domain:      s.config.Domain,
 		},
@@ -757,6 +769,90 @@ func randomSuffix(n int) string {
 	}
 	return string(b)
 }
+
+// isValidDomain validates a plain hostname (no scheme, no path).
+func isValidDomain(d string) bool {
+	if len(d) == 0 || len(d) > 253 || strings.Contains(d, "://") {
+		return false
+	}
+	labels := strings.Split(d, ".")
+	if len(labels) < 2 {
+		return false
+	}
+	for _, l := range labels {
+		if len(l) == 0 || len(l) > 63 {
+			return false
+		}
+		for i, c := range l {
+			if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
+				continue
+			}
+			if c == '-' && i > 0 && i < len(l)-1 {
+				continue
+			}
+			return false
+		}
+	}
+	return true
+}
+
+// handleAPIAddCustomDomain adds a custom domain to a tunnel.
+func (s *Server) handleAPIAddCustomDomain(w http.ResponseWriter, r *http.Request, user *models.User) {
+	if r.Method != "POST" {
+		jsonError(w, "Method not allowed", 405)
+		return
+	}
+	var req struct {
+		TunnelID int64  `json:"tunnel_id"`
+		Domain   string `json:"domain"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "Invalid request body", 400)
+		return
+	}
+	domain := strings.ToLower(strings.TrimSpace(req.Domain))
+	if domain == "" {
+		jsonError(w, "Domain is required", 400)
+		return
+	}
+	if !isValidDomain(domain) {
+		jsonError(w, "Invalid domain format. Use plain hostname, e.g. app.example.com", 400)
+		return
+	}
+	// Verify tunnel belongs to user
+	t, err := s.db.GetTunnelByID(req.TunnelID)
+	if err != nil || t.UserID != user.ID {
+		jsonError(w, "Tunnel not found", 404)
+		return
+	}
+	cd, err := s.db.CreateCustomDomain(user.ID, req.TunnelID, domain)
+	if err != nil {
+		jsonError(w, "Failed to add domain: "+err.Error(), 500)
+		return
+	}
+	jsonResponse(w, cd)
+}
+
+// handleAPIDeleteCustomDomain removes a custom domain.
+func (s *Server) handleAPIDeleteCustomDomain(w http.ResponseWriter, r *http.Request, user *models.User) {
+	if r.Method != "POST" {
+		jsonError(w, "Method not allowed", 405)
+		return
+	}
+	var req struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "Invalid request body", 400)
+		return
+	}
+	if err := s.db.DeleteCustomDomain(req.ID, user.ID); err != nil {
+		jsonError(w, "Failed to delete domain", 500)
+		return
+	}
+	jsonResponse(w, map[string]string{"status": "deleted"})
+}
+
 // --- Uptime Monitoring Handlers ---
 
 type uptimePageData struct {
