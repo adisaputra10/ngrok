@@ -68,12 +68,9 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	monitors, _ := s.db.GetAllUptimeMonitors()
-
 	s.render(w, r, "home.html", &pageData{
 		Domain:            s.config.Domain,
 		AllowRegistration: s.config.AllowRegistration,
-		Data:              monitors,
 	})
 }
 
