@@ -36,6 +36,7 @@ type tunnelsData struct {
 	Tunnels     []*tunnelWithDomains
 	Connections []*models.ConnectionInfo
 	Domain      string
+	Pagination  pagination
 }
 
 type tunnelWithDomains struct {
@@ -233,7 +234,7 @@ func (s *Server) handleTunnels(w http.ResponseWriter, r *http.Request, user *mod
 		activeSubdomains[c.Subdomain] = true
 	}
 
-	var tunnelsWithDomains []*tunnelWithDomains
+	var allTunnels []*tunnelWithDomains
 	for _, t := range tunnels {
 		if activeSubdomains[t.Subdomain] {
 			t.Status = "online"
@@ -241,19 +242,33 @@ func (s *Server) handleTunnels(w http.ResponseWriter, r *http.Request, user *mod
 			t.Status = "offline"
 		}
 		cds, _ := s.db.GetCustomDomainsByTunnelID(t.ID)
-		tunnelsWithDomains = append(tunnelsWithDomains, &tunnelWithDomains{
+		allTunnels = append(allTunnels, &tunnelWithDomains{
 			Tunnel:        t,
 			CustomDomains: cds,
 		})
+	}
+
+	const pageSize = 10
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pg := newPagination(len(allTunnels), page, pageSize)
+	start := (pg.Page - 1) * pageSize
+	end := start + pageSize
+	if end > len(allTunnels) {
+		end = len(allTunnels)
+	}
+	var pagedTunnels []*tunnelWithDomains
+	if start < len(allTunnels) {
+		pagedTunnels = allTunnels[start:end]
 	}
 
 	s.render(w, r, "tunnels.html", &pageData{
 		User:   user,
 		Domain: s.config.Domain,
 		Data: tunnelsData{
-			Tunnels:     tunnelsWithDomains,
+			Tunnels:     pagedTunnels,
 			Connections: connections,
 			Domain:      s.config.Domain,
+			Pagination:  pg,
 		},
 	})
 }
@@ -475,18 +490,63 @@ func (s *Server) handleAPIStats(w http.ResponseWriter, r *http.Request, user *mo
 	jsonResponse(w, stats)
 }
 
+// --- Pagination ---
+
+type pagination struct {
+	Page       int
+	PageSize   int
+	Total      int
+	TotalPages int
+	HasPrev    bool
+	HasNext    bool
+}
+
+func newPagination(total, page, pageSize int) pagination {
+	if page < 1 {
+		page = 1
+	}
+	totalPages := (total + pageSize - 1) / pageSize
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+	return pagination{
+		Page:       page,
+		PageSize:   pageSize,
+		Total:      total,
+		TotalPages: totalPages,
+		HasPrev:    page > 1,
+		HasNext:    page < totalPages,
+	}
+}
+
 // --- Admin Handlers ---
 
 type adminUsersData struct {
-	Users []*models.User
+	Users      []*models.User
+	Pagination pagination
 }
 
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request, user *models.User) {
 	users, _ := s.db.GetAllUsers()
+	const pageSize = 10
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pg := newPagination(len(users), page, pageSize)
+	start := (pg.Page - 1) * pageSize
+	end := start + pageSize
+	if end > len(users) {
+		end = len(users)
+	}
+	var paged []*models.User
+	if start < len(users) {
+		paged = users[start:end]
+	}
 	s.render(w, r, "admin-users.html", &pageData{
 		User:   user,
 		Domain: s.config.Domain,
-		Data:   adminUsersData{Users: users},
+		Data:   adminUsersData{Users: paged, Pagination: pg},
 	})
 }
 
@@ -869,7 +929,8 @@ func (s *Server) handleAPIDeleteCustomDomain(w http.ResponseWriter, r *http.Requ
 // --- Uptime Monitoring Handlers ---
 
 type uptimePageData struct {
-	Monitors []*uptimeMonitorView
+	Monitors   []*uptimeMonitorView
+	Pagination pagination
 }
 
 type uptimeMonitorView struct {
@@ -896,6 +957,21 @@ type uptimeLogView struct {
 func (s *Server) handleUptime(w http.ResponseWriter, r *http.Request, user *models.User) {
 	monitors, err := s.db.GetUptimeMonitorsByUserID(user.ID)
 	if err != nil {
+		monitors = nil
+	}
+
+	// Paginate the monitors list before building views (avoid loading logs for off-page items)
+	const pageSize = 5
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pg := newPagination(len(monitors), page, pageSize)
+	start := (pg.Page - 1) * pageSize
+	end := start + pageSize
+	if end > len(monitors) {
+		end = len(monitors)
+	}
+	if start < len(monitors) {
+		monitors = monitors[start:end]
+	} else {
 		monitors = nil
 	}
 
@@ -937,7 +1013,7 @@ func (s *Server) handleUptime(w http.ResponseWriter, r *http.Request, user *mode
 	s.render(w, r, "uptime.html", &pageData{
 		User:   user,
 		Domain: s.config.Domain,
-		Data:   &uptimePageData{Monitors: views},
+		Data:   &uptimePageData{Monitors: views, Pagination: pg},
 	})
 }
 

@@ -98,6 +98,8 @@ func parseTemplates() (map[string]*template.Template, error) {
 			}
 			return s[:n] + "..."
 		},
+		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
 	}
 
 	// Parse the shared base templates (base.html + sidebar.html)

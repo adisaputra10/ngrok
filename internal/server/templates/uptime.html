@@ -117,6 +117,24 @@
             </div>
             {{end}}
         </div>
+        {{if gt $data.Pagination.TotalPages 1}}
+        <div class="flex items-center justify-between mt-4 text-sm">
+            <span class="text-gray-500">{{$data.Pagination.Total}} monitors &mdash; page {{$data.Pagination.Page}} of {{$data.Pagination.TotalPages}}</span>
+            <div class="flex items-center gap-1">
+                {{if $data.Pagination.HasPrev}}
+                <a href="?page={{sub $data.Pagination.Page 1}}" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors">← Prev</a>
+                {{else}}
+                <span class="px-3 py-1.5 rounded-lg bg-gray-800/30 text-gray-600">← Prev</span>
+                {{end}}
+                <span class="px-2 text-gray-500">{{$data.Pagination.Page}} / {{$data.Pagination.TotalPages}}</span>
+                {{if $data.Pagination.HasNext}}
+                <a href="?page={{add $data.Pagination.Page 1}}" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors">Next →</a>
+                {{else}}
+                <span class="px-3 py-1.5 rounded-lg bg-gray-800/30 text-gray-600">Next →</span>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
         {{else}}
         <div class="card rounded-xl p-12 text-center text-gray-500">
             <div class="text-5xl mb-4">📡</div>
