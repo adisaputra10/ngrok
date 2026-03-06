@@ -135,7 +135,14 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request, user *
 	// Check if there's already an active connection for this subdomain
 	m.mu.Lock()
 	if existing, ok := m.tunnels[subdomain]; ok {
-		// Close the existing connection (re-connect case)
+		// If subdomain is reserved and the existing connection belongs to a different user, reject
+		if existingTunnel != nil && existingTunnel.Reserved && existing.UserID != user.ID {
+			m.mu.Unlock()
+			sendError(conn, "Subdomain is already in use")
+			conn.Close()
+			return
+		}
+		// Same user reconnecting (or non-reserved): close existing and allow new connection
 		existing.Close()
 		delete(m.tunnels, subdomain)
 	}
