@@ -4,11 +4,18 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"gotunnel/internal/server"
 )
 
 func main() {
+	// Set timezone to WIB (UTC+7)
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err == nil {
+		time.Local = loc
+	}
+
 	// Load .env file if it exists
 	server.LoadDotEnv(".env")
 
