@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"time"
 
 	"gotunnel/internal/auth"
 	"gotunnel/internal/database"
@@ -100,6 +101,7 @@ func parseTemplates() (map[string]*template.Template, error) {
 		},
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
+		"localTime": func(t time.Time, layout string) string { return t.Local().Format(layout) },
 	}
 
 	// Parse the shared base templates (base.html + sidebar.html)

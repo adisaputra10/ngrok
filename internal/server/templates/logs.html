@@ -32,7 +32,7 @@
             <div class="card rounded-xl p-4">
                 <div class="text-gray-400 text-xs">Last Connected</div>
                 <div class="text-sm font-medium mt-1.5">
-                    {{if $data.Tunnel.LastConnectedAt}}{{$data.Tunnel.LastConnectedAt.Format "2006-01-02 15:04"}}{{else}}Never{{end}}
+                    {{if $data.Tunnel.LastConnectedAt}}{{localTime $data.Tunnel.LastConnectedAt "2006-01-02 15:04"}}{{else}}Never{{end}}
                 </div>
             </div>
         </div>
@@ -56,7 +56,7 @@
                         {{range $data.Logs}}
                         <tr class="hover:bg-gray-800/20 transition">
                             <td class="px-6 py-3 text-sm text-gray-400 whitespace-nowrap font-mono text-xs">
-                                {{.CreatedAt.Format "15:04:05"}}
+                                {{localTime .CreatedAt "15:04:05"}}
                             </td>
                             <td class="px-6 py-3">
                                 <span class="font-mono text-xs font-medium {{methodColor .Method}}">{{.Method}}</span>

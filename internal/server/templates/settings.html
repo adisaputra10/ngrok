@@ -34,7 +34,7 @@
                     </div>
                     <div class="flex justify-between items-center py-2">
                         <span class="text-gray-400 text-sm">Member Since</span>
-                        <span class="text-sm">{{.User.CreatedAt.Format "January 2, 2006"}}</span>
+                        <span class="text-sm">{{localTime .User.CreatedAt "January 2, 2006"}}</span>
                     </div>
                 </div>
             </div>

@@ -57,7 +57,7 @@
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-400">{{.TotalRequests}}</td>
                             <td class="px-6 py-4 text-sm text-gray-500">
-                                {{if .LastConnectedAt}}{{.LastConnectedAt.Format "2006-01-02 15:04"}}{{else}}Never{{end}}
+                                {{if .LastConnectedAt}}{{localTime .LastConnectedAt "2006-01-02 15:04"}}{{else}}Never{{end}}
                             </td>
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">

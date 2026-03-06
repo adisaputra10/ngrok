@@ -987,13 +987,13 @@ func (s *Server) handleUptime(w http.ResponseWriter, r *http.Request, user *mode
 				LatencyMs:  l.LatencyMs,
 				StatusCode: l.StatusCode,
 				Error:      l.Error,
-				CheckedAt:  l.CheckedAt.Format("2006-01-02 15:04:05"),
+				CheckedAt:  l.CheckedAt.Local().Format("2006-01-02 15:04:05"),
 			})
 		}
 
 		lastChecked := "Never"
 		if m.LastCheckedAt != nil {
-			lastChecked = m.LastCheckedAt.Format("2006-01-02 15:04:05")
+			lastChecked = m.LastCheckedAt.Local().Format("2006-01-02 15:04:05")
 		}
 
 		views = append(views, &uptimeMonitorView{
