@@ -193,7 +193,7 @@ func (s *Service) doTCPCheck(m *models.UptimeMonitor) CheckResult {
 		h, p, err := net.SplitHostPort(host)
 		if err != nil {
 			// No port specified — default to 80
-			host = net.JoinHostPort(h, "80")
+			host = net.JoinHostPort(host, "80")
 		} else {
 			host = net.JoinHostPort(h, p)
 		}
