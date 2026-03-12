@@ -211,7 +211,6 @@ func startTunnel(config Config, subdomain, localPort string) {
 	fmt.Println()
 	fmt.Printf("Demolocal v%s\n", version)
 	fmt.Println()
-	fmt.Printf("Connecting to %s...", config.ServerURL)
 
 	// Build WebSocket URL:
 	//   - already has scheme (ws:// / wss://)  → use as-is
@@ -225,34 +224,81 @@ func startTunnel(config Config, subdomain, localPort string) {
 		serverHost = strings.Replace(serverHost, "https://", "wss://", 1)
 		serverHost = strings.Replace(serverHost, "http://", "ws://", 1)
 	case strings.HasSuffix(config.ServerURL, ":443"):
-		// Explicit port 443 — use wss:// without the port
 		serverHost = "wss://" + strings.TrimSuffix(config.ServerURL, ":443")
 	case strings.Contains(config.ServerURL, ":"):
-		// host:port (non-443) — plain WS for local/dev
 		serverHost = "ws://" + config.ServerURL
 	default:
-		// plain domain — use WSS (TLS on port 443)
 		serverHost = "wss://" + config.ServerURL
 	}
-	fmt.Printf(" (%s)\n", serverHost)
 
 	wsURL := fmt.Sprintf("%s/ws/tunnel?token=%s", serverHost, url.QueryEscape(config.AuthToken))
 
-	// Connect WebSocket
+	// Handle Ctrl+C / SIGTERM
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	// Reconnect loop with exponential backoff
+	const (
+		minBackoff = 2 * time.Second
+		maxBackoff = 30 * time.Second
+	)
+	backoff := minBackoff
+	attempt := 0
+
+	for {
+		attempt++
+		if attempt == 1 {
+			fmt.Printf("Connecting to %s... (%s)\n", config.ServerURL, serverHost)
+		} else {
+			fmt.Printf("\nReconnecting to %s (attempt %d)...\n", config.ServerURL, attempt)
+		}
+
+		connected := tryConnect(wsURL, subdomain, localPort, sigCh)
+
+		if connected == exitSignal {
+			fmt.Println("\nShutting down tunnel...")
+			return
+		}
+
+		// Connection lost or failed — wait with backoff before retrying
+		fmt.Printf("Reconnecting in %s...\n", backoff.Round(time.Second))
+		select {
+		case <-sigCh:
+			fmt.Println("\nShutting down tunnel...")
+			return
+		case <-time.After(backoff):
+		}
+
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
+}
+
+type exitReason int
+
+const (
+	exitSignal     exitReason = iota // SIGINT / SIGTERM — stop retrying
+	exitDisconnect                   // server / network drop — retry
+)
+
+// tryConnect makes a single connection attempt. Returns the reason it ended.
+func tryConnect(wsURL, subdomain, localPort string, sigCh <-chan os.Signal) exitReason {
 	dialer := websocket.Dialer{
-		HandshakeTimeout: 10 * time.Second,
+		HandshakeTimeout: 15 * time.Second,
 	}
 
 	conn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
-		fmt.Printf("Error: Failed to connect: %v\n", err)
-		os.Exit(1)
+		fmt.Printf("Connection failed: %v\n", err)
+		return exitDisconnect
 	}
 	defer conn.Close()
 
 	// Send tunnel init
 	initPayload := protocol.TunnelInitPayload{
-		AuthToken: config.AuthToken,
+		AuthToken: "", // token is in the URL query param
 		Subdomain: subdomain,
 		LocalPort: parseInt(localPort),
 		Version:   version,
@@ -261,15 +307,17 @@ func startTunnel(config Config, subdomain, localPort string) {
 	initMsg, _ := protocol.NewMessage(protocol.TypeTunnelInit, "", initPayload)
 	initData, _ := json.Marshal(initMsg)
 	if err := conn.WriteMessage(websocket.TextMessage, initData); err != nil {
-		fmt.Printf("Error: Failed to send init: %v\n", err)
-		os.Exit(1)
+		fmt.Printf("Failed to send init: %v\n", err)
+		return exitDisconnect
 	}
 
 	// Read response
+	conn.SetReadDeadline(time.Now().Add(15 * time.Second))
 	_, msg, err := conn.ReadMessage()
+	conn.SetReadDeadline(time.Time{})
 	if err != nil {
-		fmt.Printf("Error: Failed to read response: %v\n", err)
-		os.Exit(1)
+		fmt.Printf("Failed to read init response: %v\n", err)
+		return exitDisconnect
 	}
 
 	var response protocol.Message
@@ -278,13 +326,14 @@ func startTunnel(config Config, subdomain, localPort string) {
 	if response.Type == protocol.TypeTunnelError {
 		var errPayload protocol.TunnelErrorPayload
 		response.ParsePayload(&errPayload)
-		fmt.Printf("Error: %s\n", errPayload.Error)
-		os.Exit(1)
+		fmt.Printf("Server error: %s\n", errPayload.Error)
+		// Auth/reserved errors — still retry (server may restart), but back off
+		return exitDisconnect
 	}
 
 	if response.Type != protocol.TypeTunnelReady {
-		fmt.Printf("Error: Unexpected response: %s\n", response.Type)
-		os.Exit(1)
+		fmt.Printf("Unexpected response: %s\n", response.Type)
+		return exitDisconnect
 	}
 
 	var ready protocol.TunnelReadyPayload
@@ -296,22 +345,17 @@ func startTunnel(config Config, subdomain, localPort string) {
 	fmt.Println("Press Ctrl+C to stop the tunnel.")
 	fmt.Println()
 
-	// Handle Ctrl+C
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-
 	doneCh := make(chan struct{})
 	requestCount := int64(0)
 	var writeMu sync.Mutex
 
-	// Safe write helper
 	writeMsg := func(messageType int, data []byte) error {
 		writeMu.Lock()
 		defer writeMu.Unlock()
 		return conn.WriteMessage(messageType, data)
 	}
 
-	// Process incoming requests
+	// Process incoming messages
 	go func() {
 		defer close(doneCh)
 		for {
@@ -341,18 +385,17 @@ func startTunnel(config Config, subdomain, localPort string) {
 		}
 	}()
 
-	// Wait for signal or disconnect
 	select {
 	case <-sigCh:
-		fmt.Println("\nShutting down tunnel...")
 		writeMu.Lock()
 		conn.WriteMessage(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 		writeMu.Unlock()
+		return exitSignal
 	case <-doneCh:
+		fmt.Printf("\033[33mTunnel disconnected.\033[0m\n")
+		return exitDisconnect
 	}
-
-	fmt.Println("Tunnel closed.")
 }
 
 func handleHTTPRequest(writeMsg func(int, []byte) error, message *protocol.Message, localPort string, reqNum int64) {
