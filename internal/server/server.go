@@ -121,6 +121,7 @@ func parseTemplates() (map[string]*template.Template, error) {
 		"settings.html",
 		"logs.html",
 		"admin-users.html",
+		"admin-tunnels.html",
 		"uptime.html",
 	}
 
@@ -168,6 +169,7 @@ func (s *Server) adminHandler() http.Handler {
 
 	// Admin routes
 	mux.HandleFunc("/admin/users", s.requireAdmin(s.handleAdminUsers))
+	mux.HandleFunc("/admin/tunnels", s.requireAdmin(s.handleAdminTunnels))
 	mux.HandleFunc("/admin/impersonate/", s.requireAdmin(s.handleAdminImpersonate))
 	mux.HandleFunc("/admin/stop-impersonate", s.requireAuth(s.handleAdminStopImpersonate))
 
@@ -181,6 +183,7 @@ func (s *Server) adminHandler() http.Handler {
 	mux.HandleFunc("/api/admin/users/update", s.requireAdmin(s.handleAPIAdminUpdateUser))
 	mux.HandleFunc("/api/admin/users/delete", s.requireAdmin(s.handleAPIAdminDeleteUser))
 	mux.HandleFunc("/api/admin/users/reset-password", s.requireAdmin(s.handleAPIAdminResetPassword))
+	mux.HandleFunc("/api/admin/tunnels/delete", s.requireAdmin(s.handleAPIAdminDeleteTunnel))
 
 	// Uptime monitoring routes
 	mux.HandleFunc("/dashboard/uptime", s.requireAuth(s.handleUptime))

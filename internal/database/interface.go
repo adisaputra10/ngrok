@@ -37,6 +37,7 @@ type DB interface {
 	UpdateTunnelStatus(subdomain, status string) error
 	IncrementTunnelRequests(subdomain string) error
 	DeleteTunnel(id int64, userID int64) error
+	AdminDeleteTunnel(id int64) error
 	GetAllTunnels() ([]*models.Tunnel, error)
 
 	// Request log operations

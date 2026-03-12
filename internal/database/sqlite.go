@@ -521,6 +521,12 @@ func (db *SQLiteDB) DeleteTunnel(id int64, userID int64) error {
 	return err
 }
 
+// AdminDeleteTunnel deletes any tunnel by id (admin only, no user check)
+func (db *SQLiteDB) AdminDeleteTunnel(id int64) error {
+	_, err := db.conn.Exec(`DELETE FROM tunnels WHERE id = ?`, id)
+	return err
+}
+
 // GetAllTunnels returns all tunnels (for admin)
 func (db *SQLiteDB) GetAllTunnels() ([]*models.Tunnel, error) {
 	rows, err := db.conn.Query(

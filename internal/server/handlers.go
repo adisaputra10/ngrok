@@ -370,12 +370,10 @@ func (s *Server) handleAPIReserveTunnel(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "Subdomain is required", 400)
 		return
 	}
-
-	// Append 2 random alphanumeric chars for uniqueness
-	if len(subdomain) > 61 {
-		subdomain = subdomain[:61]
+	if len(subdomain) > 63 {
+		jsonError(w, "Subdomain too long (max 63 characters)", 400)
+		return
 	}
-	subdomain = subdomain + "-" + randomSuffix(2)
 
 	// Check max tunnels
 	tunnels, _ := s.db.GetTunnelsByUserID(user.ID)
@@ -548,6 +546,75 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request, user *
 		Domain: s.config.Domain,
 		Data:   adminUsersData{Users: paged, Pagination: pg},
 	})
+}
+
+type adminTunnelsData struct {
+	Tunnels    []*models.Tunnel
+	Pagination pagination
+	Domain     string
+}
+
+func (s *Server) handleAdminTunnels(w http.ResponseWriter, r *http.Request, user *models.User) {
+	tunnels, _ := s.db.GetAllTunnels()
+
+	// Merge live status from active connections
+	activeSubdomains := make(map[string]bool)
+	for _, c := range s.tunnelMgr.GetActiveConnections() {
+		activeSubdomains[c.Subdomain] = true
+	}
+	for _, t := range tunnels {
+		if activeSubdomains[t.Subdomain] {
+			t.Status = "online"
+		} else {
+			t.Status = "offline"
+		}
+	}
+
+	const pageSize = 20
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pg := newPagination(len(tunnels), page, pageSize)
+	start := (pg.Page - 1) * pageSize
+	end := start + pageSize
+	if end > len(tunnels) {
+		end = len(tunnels)
+	}
+	var paged []*models.Tunnel
+	if start < len(tunnels) {
+		paged = tunnels[start:end]
+	}
+
+	s.render(w, r, "admin-tunnels.html", &pageData{
+		User:   user,
+		Domain: s.config.Domain,
+		Data: adminTunnelsData{
+			Tunnels:    paged,
+			Pagination: pg,
+			Domain:     s.config.Domain,
+		},
+	})
+}
+
+func (s *Server) handleAPIAdminDeleteTunnel(w http.ResponseWriter, r *http.Request, user *models.User) {
+	if r.Method != "POST" {
+		jsonError(w, "Method not allowed", 405)
+		return
+	}
+
+	var req struct {
+		TunnelID int64 `json:"tunnel_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "Invalid request body", 400)
+		return
+	}
+
+	if err := s.db.AdminDeleteTunnel(req.TunnelID); err != nil {
+		jsonError(w, "Failed to delete tunnel", 500)
+		return
+	}
+
+	log.Printf("[admin] %s (id:%d) deleted tunnel id:%d", user.Username, user.ID, req.TunnelID)
+	jsonResponse(w, map[string]string{"status": "deleted"})
 }
 
 // handleAdminImpersonate creates a session for a target user, saving the admin session aside

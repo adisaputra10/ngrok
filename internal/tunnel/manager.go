@@ -115,12 +115,7 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request, user *
 
 	// Create or update tunnel record in DB
 	if err != nil {
-		// Tunnel doesn't exist — append 2 random chars for uniqueness
-		base := subdomain
-		if len(base) > 61 {
-			base = base[:61]
-		}
-		subdomain = base + "-" + randomSuffix(2)
+		// Tunnel doesn't exist — create with exact subdomain as requested
 		_, err = m.db.CreateTunnel(user.ID, subdomain, false)
 		if err != nil {
 			sendError(conn, "Failed to create tunnel: "+err.Error())

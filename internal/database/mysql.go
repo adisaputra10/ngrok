@@ -413,6 +413,12 @@ func (db *MySQLDB) DeleteTunnel(id int64, userID int64) error {
 	return err
 }
 
+// AdminDeleteTunnel deletes any tunnel by id (admin only, no user check)
+func (db *MySQLDB) AdminDeleteTunnel(id int64) error {
+	_, err := db.conn.Exec(`DELETE FROM tunnels WHERE id = ?`, id)
+	return err
+}
+
 func (db *MySQLDB) GetAllTunnels() ([]*models.Tunnel, error) {
 	rows, err := db.conn.Query(
 		`SELECT t.id, t.user_id, t.subdomain, t.status, t.reserved, t.created_at, t.last_connected_at, t.total_requests, COALESCE(u.username, '')
